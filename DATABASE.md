@@ -12,7 +12,7 @@
 
 | カラム | 型 | 制約 | 説明 |
 | --- | --- | --- | --- |
-| `id` | BIGINT | PK | 主キー |
+| `id` | INTEGER | PK, AUTOINCREMENT | 主キー（SQLite では自動採番のため INTEGER を使用） |
 | `email` | VARCHAR | UNIQUE, NOT NULL | ログインID |
 | `passwordHash` | VARCHAR | NOT NULL | ハッシュ化したパスワード |
 | `displayName` | VARCHAR | | 表示名 |
