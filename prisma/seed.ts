@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { hashPassword } from "@/lib/password";
 
 async function main() {
+  // 開発用ログインパスワード（平文）。bcrypt でハッシュ化して保存する。
+  const password = "password";
+
   const data = {
     email: "kino2718@gmail.com",
-    passwordHash: "password", // 仮
+    passwordHash: await hashPassword(password),
     displayName: "kino2718",
   };
 
