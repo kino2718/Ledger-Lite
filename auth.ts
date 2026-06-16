@@ -1,7 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/lib/password";
+import { authorizeCredentials } from "@/lib/credentials";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Credentials ではセッションは JWT 方式（DB セッション/アダプタは併用不可）。
@@ -14,27 +13,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (credentials) => {
-        const email = credentials?.email;
-        const password = credentials?.password;
-        if (typeof email !== "string" || typeof password !== "string") {
-          return null;
-        }
-
-        // email でユーザーを取得し、bcrypt で平文と保存ハッシュを照合する。
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
-
-        const ok = await verifyPassword(password, user.passwordHash);
-        if (!ok) return null;
-
-        // Auth.js に渡すユーザー情報。id は文字列が慣例。
-        return {
-          id: String(user.id),
-          email: user.email,
-          name: user.displayName,
-        };
-      },
+      // 照合ロジックは lib/credentials.ts に切り出してテスト可能にしている。
+      authorize: (credentials) => authorizeCredentials(credentials),
     }),
   ],
   callbacks: {
