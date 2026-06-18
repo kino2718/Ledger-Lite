@@ -19,4 +19,115 @@ model User {
   displayName  String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  accounts       Account[]
+  journalEntries JournalEntry[]
+}
+
+// 勘定科目の分類。損益計算書・貸借対照表への集計単位。
+enum AccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
+// 勘定科目マスタ。
+model Account {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  code        String?
+  name        String
+  accountType AccountType
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // 配下データを持つユーザーは削除させない（誤操作によるデータ消失防止）。
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subAccounts  SubAccount[]
+  journalLines JournalLine[]
+
+  // 同一ユーザー内で科目コード・科目名の重複を禁止する。
+  @@unique([userId, code])
+  @@unique([userId, name])
+}
+
+// 補助科目マスタ。勘定科目の内訳分析用（決算書には集計されない）。
+model SubAccount {
+  id        Int      @id @default(autoincrement())
+  accountId Int
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 補助科目が残る勘定科目は削除させない。所有ユーザーは account 経由で辿る。
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  journalLines JournalLine[]
+
+  // 同一勘定科目内で同名の補助科目を禁止する。
+  @@unique([accountId, name])
+}
+
+// 仕訳の状態。
+enum JournalStatus {
+  draft
+  posted
+}
+
+// 仕訳ヘッダー。1回の取引を表す。
+model JournalEntry {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  entryDate   String // 取引日。YYYY-MM-DD 形式の文字列。
+  description String?
+  status      JournalStatus @default(draft)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // ヘッダー削除で明細も連動削除する。
+  lines JournalLine[]
+
+  // ユーザー単位＋期間での仕訳検索・一覧用。
+  @@index([userId, entryDate])
+}
+
+// 借方/貸方の区分。
+enum EntrySide {
+  debit
+  credit
+}
+
+// 税区分。
+enum TaxCategory {
+  taxable_10
+  taxable_8
+  tax_free
+  non_taxable
+}
+
+// 仕訳明細。複式簿記の本体。1 仕訳に 2 行以上ぶら下がる。
+model JournalLine {
+  id           Int          @id @default(autoincrement())
+  entryId      Int
+  lineNo       Int // 取引内の表示順（1始まり）。
+  accountId    Int
+  subAccountId Int?
+  side         EntrySide
+  amount       Int // 金額。円単位の整数で必ず正の値（アプリ側で検証）。
+  taxCategory  TaxCategory?
+  lineMemo     String?
+
+  entry      JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  // 仕訳から参照中の科目は削除させない。
+  account    Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  subAccount SubAccount?  @relation(fields: [subAccountId], references: [id], onDelete: Restrict)
+
+  // 同一取引内で行番号の重複を禁止（表示順を一意化）。entryId 単独取得も兼ねる。
+  @@unique([entryId, lineNo])
+  @@index([accountId])
+  @@index([subAccountId])
 }
