@@ -43,3 +43,6 @@ next-env.d.ts
 /generated/prisma
 /dev.db*
 /test.db*
+
+# 設計時に参照するローカル専用の資料（git 管理外）
+/reference
