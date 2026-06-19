@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "seed:sample": "tsx prisma/seed-sample.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",
