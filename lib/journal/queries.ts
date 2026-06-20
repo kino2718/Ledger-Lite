@@ -3,11 +3,28 @@
 // 集計そのものは lib/ledger の純粋関数に任せ、ここは「DBから取って形を整える」だけ。
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { BalanceLine } from "@/lib/ledger/types";
+import type { AccountType, BalanceLine } from "@/lib/ledger/types";
 import type { JournalStatus } from "@/generated/prisma/enums";
 
 // 取引日（YYYY-MM-DD 文字列）の範囲指定。辞書順＝日付順なので文字列比較で足りる。
 export type DateRange = { from?: string; to?: string };
+
+// 残高表示などで科目名を引くための最小情報。
+export type AccountSummary = {
+  id: number;
+  code: string | null;
+  name: string;
+  accountType: AccountType;
+};
+
+/** ユーザーの勘定科目を科目コード順に取得する。 */
+export async function getAccounts(userId: number): Promise<AccountSummary[]> {
+  return prisma.account.findMany({
+    where: { userId },
+    orderBy: { code: "asc" },
+    select: { id: true, code: true, name: true, accountType: true },
+  });
+}
 
 /**
  * 残高・損益の集計用に、ユーザーの仕訳明細を BalanceLine の形で取得する。
