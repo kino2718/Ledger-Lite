@@ -39,7 +39,6 @@ function createEntry(
       userId,
       entryDate,
       description,
-      status: "posted",
       lines: {
         create: lines.map((line, i) => ({ lineNo: i + 1, ...line })),
       },
@@ -144,7 +143,6 @@ describe("getRecentJournalEntries", () => {
       "古い取引",
     ]);
     expect(recent[0].total).toBe(5000);
-    expect(recent[0].status).toBe("posted");
   });
 
   test("limit で件数を制限する", async () => {

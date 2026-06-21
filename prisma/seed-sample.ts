@@ -145,7 +145,6 @@ async function main() {
           userId: user.id,
           entryDate: entry.entryDate,
           description: entry.description,
-          status: "posted",
           lines: {
             create: entry.lines.map((line, i) => ({
               lineNo: i + 1,

@@ -4,7 +4,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AccountType, BalanceLine } from "@/lib/ledger/types";
-import type { JournalStatus } from "@/generated/prisma/enums";
 
 // 取引日（YYYY-MM-DD 文字列）の範囲指定。辞書順＝日付順なので文字列比較で足りる。
 export type DateRange = { from?: string; to?: string };
@@ -65,7 +64,6 @@ export type RecentEntry = {
   id: number;
   entryDate: string;
   description: string | null;
-  status: JournalStatus;
   total: number;
 };
 
@@ -83,7 +81,6 @@ export async function getRecentJournalEntries(
       id: true,
       entryDate: true,
       description: true,
-      status: true,
       lines: { select: { side: true, amount: true } },
     },
   });
@@ -92,7 +89,6 @@ export async function getRecentJournalEntries(
     id: entry.id,
     entryDate: entry.entryDate,
     description: entry.description,
-    status: entry.status,
     total: entry.lines
       .filter((line) => line.side === "debit")
       .reduce((sum, line) => sum + line.amount, 0),
