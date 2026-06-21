@@ -72,3 +72,55 @@ function sumBySide(lines: JournalLineInput[], side: Side): number {
     .filter((line) => line.side === side)
     .reduce((sum, line) => sum + line.amount, 0);
 }
+
+// マスタ参照の検証に渡す勘定科目（補助科目つき）。
+// 呼び出し側は「その仕訳のユーザーが所有する科目」だけを渡すこと。
+// これにより、ここに無い accountId は「存在しない or 他ユーザーのもの」として弾ける。
+export type SubAccountMaster = {
+  id: number;
+  isActive: boolean;
+};
+
+export type AccountMaster = {
+  id: number;
+  isActive: boolean;
+  subAccounts: SubAccountMaster[];
+};
+
+/**
+ * マスタ（勘定科目・補助科目）と照合して仕訳を検証する。
+ * 科目の存在・所有ユーザー一致（accounts に含まれるか）・有効性、
+ * および補助科目の整合（その科目に属するか）・有効性を確認する。
+ * accounts はその仕訳のユーザーが所有する科目のみを渡す前提。
+ */
+export function validateAgainstMasters(
+  entry: JournalEntryInput,
+  accounts: AccountMaster[],
+): ValidationResult {
+  // 同種のメッセージを重複させないよう Set に集める。
+  const errors = new Set<string>();
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+
+  for (const line of entry.lines) {
+    const account = accountById.get(line.accountId);
+    if (!account) {
+      // accounts はユーザー所有分のみなので、無ければ存在しないか他ユーザーのもの。
+      errors.add("勘定科目が存在しないか、利用できません。");
+      continue; // 科目が確定しないと補助科目の整合も判定できない。
+    }
+    if (!account.isActive) {
+      errors.add("無効な勘定科目は使用できません。");
+    }
+
+    if (line.subAccountId !== null) {
+      const sub = account.subAccounts.find((s) => s.id === line.subAccountId);
+      if (!sub) {
+        errors.add("補助科目がその勘定科目に属していません。");
+      } else if (!sub.isActive) {
+        errors.add("無効な補助科目は使用できません。");
+      }
+    }
+  }
+
+  return errors.size === 0 ? { ok: true } : { ok: false, errors: [...errors] };
+}
