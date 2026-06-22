@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* ネイティブUI（日付ピッカーのアイコン・セレクト・スクロールバー等）を
+     ユーザーのテーマに追従させる。ダーク時にカレンダーアイコンが
+     背景へ溶け込んで見えなくなるのを防ぐ。 */
+  color-scheme: light dark;
   --background: #ffffff;
   --foreground: #171717;
 }
