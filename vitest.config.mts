@@ -5,8 +5,8 @@ export default defineConfig({
   // Vite がネイティブ対応しているため専用プラグインは不要。
   resolve: { tsconfigPaths: true },
   test: {
-    // 純粋ロジックも Prisma 統合テストも Node 上で動く（DOM 不要）。
-    // React コンポーネントの描画テストを足す段階で jsdom を追加検討する。
+    // 既定は Node。React コンポーネントの描画テストは、ファイル先頭の
+    // `// @vitest-environment jsdom` で jsdom に切り替える（個別指定）。
     environment: "node",
 
     // 統合テストはファイルベースの test.db を共有するため、
@@ -23,8 +23,9 @@ export default defineConfig({
     // 全テスト開始前に一度だけ test.db のスキーマを初期化する。
     globalSetup: ["./tests/global-setup.ts"],
 
-    // 各テストファイルの実行前に読み込まれ、テーブルを空にする。
-    setupFiles: ["./tests/setup.ts"],
+    // 各テストファイルの実行前に読み込まれる。
+    // setup.ts: テーブルを空にする / setup-dom.ts: jest-dom マッチャー登録。
+    setupFiles: ["./tests/setup.ts", "./tests/setup-dom.ts"],
 
     // テスト対象から除外するパス。
     exclude: [
