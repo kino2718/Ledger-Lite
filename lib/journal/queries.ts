@@ -25,6 +25,36 @@ export async function getAccounts(userId: number): Promise<AccountSummary[]> {
   });
 }
 
+// 仕訳入力フォームの選択肢用。有効な科目と、その有効な補助科目だけを含む。
+export type AccountOption = {
+  id: number;
+  code: string | null;
+  name: string;
+  accountType: AccountType;
+  subAccounts: { id: number; name: string }[];
+};
+
+/** 入力フォーム用に、有効な勘定科目（有効な補助科目つき）をコード順で取得する。 */
+export async function getAccountOptions(
+  userId: number,
+): Promise<AccountOption[]> {
+  return prisma.account.findMany({
+    where: { userId, isActive: true },
+    orderBy: { code: "asc" },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      accountType: true,
+      subAccounts: {
+        where: { isActive: true },
+        orderBy: { id: "asc" },
+        select: { id: true, name: true },
+      },
+    },
+  });
+}
+
 /**
  * 残高・損益の集計用に、ユーザーの仕訳明細を BalanceLine の形で取得する。
  * period を渡すと取引日でその範囲に絞る（損益の月次集計などに使う）。
