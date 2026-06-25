@@ -2,18 +2,18 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { createEntryAction } from "./actions";
 import type { AccountOption } from "@/lib/journal/queries";
+import type { JournalFormState } from "@/lib/journal/form";
 
 // 入力中は文字列で保持する。借方・貸方それぞれが 1 つの side を持つ。
-type SideInput = {
+export type SideInput = {
   accountId: string;
   subAccountId: string;
   amount: string;
 };
 
 // 借方・貸方を左右に並べた 1 組。片側だけ入力されることもある。
-type Pair = {
+export type Pair = {
   debit: SideInput;
   credit: SideInput;
 };
@@ -23,7 +23,10 @@ const emptySide = (): SideInput => ({
   subAccountId: "",
   amount: "",
 });
-const emptyPair = (): Pair => ({ debit: emptySide(), credit: emptySide() });
+export const emptyPair = (): Pair => ({
+  debit: emptySide(),
+  credit: emptySide(),
+});
 
 // 今日の日付を YYYY-MM-DD で返す。
 function todayString(): string {
@@ -104,14 +107,34 @@ function SideFields({
   );
 }
 
-export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
-  const [state, formAction, pending] = useActionState(
-    createEntryAction,
-    undefined,
-  );
+// 作成・編集の両方で使う。action と初期値を差し替えるだけで挙動を切り替える。
+type JournalFormProps = {
+  accounts: AccountOption[];
+  // useActionState に渡す Server Action（作成 or 更新）。
+  action: (
+    prevState: JournalFormState | undefined,
+    formData: FormData,
+  ) => Promise<JournalFormState | undefined>;
+  initialEntryDate?: string;
+  initialDescription?: string;
+  initialPairs?: Pair[];
+  submitLabel?: string;
+  cancelHref?: string;
+};
 
-  // 借方・貸方の組を 1 組から始める。
-  const [pairs, setPairs] = useState<Pair[]>([emptyPair()]);
+export function JournalForm({
+  accounts,
+  action,
+  initialEntryDate,
+  initialDescription,
+  initialPairs,
+  submitLabel = "保存",
+  cancelHref = "/",
+}: JournalFormProps) {
+  const [state, formAction, pending] = useActionState(action, undefined);
+
+  // 編集時は既存明細から作った組を、新規時は空の 1 組から始める。
+  const [pairs, setPairs] = useState<Pair[]>(initialPairs ?? [emptyPair()]);
 
   const updateSide = (
     index: number,
@@ -162,7 +185,7 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
             name="entryDate"
             type="date"
             required
-            defaultValue={todayString()}
+            defaultValue={initialEntryDate ?? todayString()}
             className={inputClass}
           />
         </div>
@@ -178,6 +201,7 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
             name="description"
             type="text"
             placeholder="例: 現金売上"
+            defaultValue={initialDescription}
             className={inputClass}
           />
         </div>
@@ -274,10 +298,10 @@ export function JournalForm({ accounts }: { accounts: AccountOption[] }) {
           disabled={pending}
           className="h-11 rounded-full bg-black px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
         >
-          {pending ? "保存中..." : "保存"}
+          {pending ? "保存中..." : submitLabel}
         </button>
         <Link
-          href="/"
+          href={cancelHref}
           className="text-sm text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
         >
           キャンセル

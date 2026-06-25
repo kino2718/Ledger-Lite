@@ -3,13 +3,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountOption } from "@/lib/journal/queries";
-
-// Server Action を読み込むと server-only / Prisma まで芋づるに走るため、
-// アクションはモックに差し替える（このテストは UI 挙動と送信内容を検証する）。
-const { actionMock } = vi.hoisted(() => ({ actionMock: vi.fn() }));
-vi.mock("./actions", () => ({ createEntryAction: actionMock }));
-
 import { JournalForm } from "./JournalForm";
+import type { Pair } from "./JournalForm";
+
+// JournalForm は action を prop で受け取るため、テストではモックを渡す
+// （server-only / Prisma を芋づるに読み込まない）。
+const actionMock = vi.fn();
 
 const accounts: AccountOption[] = [
   { id: 1, code: "100", name: "現金", accountType: "asset", subAccounts: [] },
@@ -22,6 +21,13 @@ const accounts: AccountOption[] = [
     subAccounts: [{ id: 5, name: "電気" }],
   },
 ];
+
+// action を毎回渡す手間を省くレンダーヘルパー。追加の props は上書きできる。
+function renderForm(props: Partial<React.ComponentProps<typeof JournalForm>> = {}) {
+  return render(
+    <JournalForm accounts={accounts} action={actionMock} {...props} />,
+  );
+}
 
 // name 属性で input/select を取り出すヘルパー（同種コントロールが多いため）。
 function field(name: string): HTMLElement {
@@ -41,7 +47,7 @@ afterEach(cleanup);
 
 describe("JournalForm", () => {
   test("初期表示では借方・貸方の見出しと科目の選択肢が出る", () => {
-    render(<JournalForm accounts={accounts} />);
+    renderForm();
     expect(screen.getByText("借方")).toBeInTheDocument();
     expect(screen.getByText("貸方")).toBeInTheDocument();
     // 科目名が option として描画されている。
@@ -55,7 +61,7 @@ describe("JournalForm", () => {
 
   test("「明細を追加」で行が増え、×で減る", async () => {
     const user = userEvent.setup();
-    render(<JournalForm accounts={accounts} />);
+    renderForm();
     expect(rowCount()).toBe(1);
 
     await user.click(screen.getByRole("button", { name: "明細を追加 +" }));
@@ -70,7 +76,7 @@ describe("JournalForm", () => {
 
   test("科目を選ぶと、その科目の補助科目だけが選べる", async () => {
     const user = userEvent.setup();
-    render(<JournalForm accounts={accounts} />);
+    renderForm();
 
     const debitSub = field("debitSubAccountId.0") as HTMLSelectElement;
     // 初期（科目未選択）は補助科目セレクトが無効。
@@ -86,7 +92,7 @@ describe("JournalForm", () => {
 
   test("金額を入力すると貸借の一致/不一致が切り替わる", async () => {
     const user = userEvent.setup();
-    render(<JournalForm accounts={accounts} />);
+    renderForm();
     // 初期は 0 = 0 なので一致。
     expect(screen.getByText("貸借一致")).toBeInTheDocument();
 
@@ -99,7 +105,7 @@ describe("JournalForm", () => {
 
   test("送信すると正しいフィールド名で FormData が渡る（契約）", async () => {
     const user = userEvent.setup();
-    render(<JournalForm accounts={accounts} />);
+    renderForm();
 
     await user.selectOptions(field("debitAccountId.0"), "1");
     await user.type(field("debitAmount.0"), "1000");
@@ -123,7 +129,7 @@ describe("JournalForm", () => {
       errors: ["借方合計と貸方合計が一致していません。"],
     });
     const user = userEvent.setup();
-    render(<JournalForm accounts={accounts} />);
+    renderForm();
 
     await user.type(field("debitAmount.0"), "1000");
     await user.click(screen.getByRole("button", { name: "保存" }));
@@ -131,5 +137,49 @@ describe("JournalForm", () => {
     expect(
       await screen.findByText("借方合計と貸方合計が一致していません。"),
     ).toBeInTheDocument();
+  });
+
+  // 編集モード: 初期値（日付・摘要・明細・ボタンのラベル）を受け取って描画し、
+  // そのまま送信できる。
+  test("初期値を渡すと編集モードとして埋まった状態で表示・送信できる", async () => {
+    const initialPairs: Pair[] = [
+      {
+        debit: { accountId: "10", subAccountId: "5", amount: "8000" },
+        credit: { accountId: "", subAccountId: "", amount: "" },
+      },
+      {
+        debit: { accountId: "", subAccountId: "", amount: "" },
+        credit: { accountId: "1", subAccountId: "", amount: "8000" },
+      },
+    ];
+    const user = userEvent.setup();
+    renderForm({
+      initialEntryDate: "2026-06-12",
+      initialDescription: "電気料金",
+      initialPairs,
+      submitLabel: "更新",
+    });
+
+    // 初期値が各フィールドに反映されている。
+    expect((field("entryDate") as HTMLInputElement).value).toBe("2026-06-12");
+    expect((field("description") as HTMLInputElement).value).toBe("電気料金");
+    expect((field("debitAccountId.0") as HTMLSelectElement).value).toBe("10");
+    expect((field("debitSubAccountId.0") as HTMLSelectElement).value).toBe("5");
+    expect((field("debitAmount.0") as HTMLInputElement).value).toBe("8000");
+    expect((field("creditAccountId.1") as HTMLSelectElement).value).toBe("1");
+    expect((field("creditAmount.1") as HTMLInputElement).value).toBe("8000");
+    // 2 組ぶんの行が描画される。貸借も一致。
+    expect(rowCount()).toBe(2);
+    expect(screen.getByText("貸借一致")).toBeInTheDocument();
+
+    // ボタンのラベルは submitLabel。押すと action にそのまま送信される。
+    await user.click(screen.getByRole("button", { name: "更新" }));
+    await waitFor(() => expect(actionMock).toHaveBeenCalledTimes(1));
+    const formData = actionMock.mock.calls[0][1] as FormData;
+    expect(formData.get("pairCount")).toBe("2");
+    expect(formData.get("debitAccountId.0")).toBe("10");
+    expect(formData.get("debitSubAccountId.0")).toBe("5");
+    expect(formData.get("creditAccountId.1")).toBe("1");
+    expect(formData.get("description")).toBe("電気料金");
   });
 });

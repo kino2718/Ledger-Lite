@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
 import { getAccountOptions } from "@/lib/journal/queries";
-import { JournalForm } from "./JournalForm";
+import { JournalForm } from "../JournalForm";
+import { createEntryAction } from "./actions";
 
 export default async function NewJournalEntryPage() {
   const session = await verifySession();
@@ -24,7 +25,7 @@ export default async function NewJournalEntryPage() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-        <JournalForm accounts={accounts} />
+        <JournalForm accounts={accounts} action={createEntryAction} />
       </main>
     </div>
   );

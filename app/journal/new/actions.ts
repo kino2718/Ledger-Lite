@@ -5,18 +5,15 @@ import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/session";
 import { createJournalEntry } from "@/lib/journal/create";
 import { parseJournalEntryForm } from "@/lib/journal/form";
-
-export type NewEntryState = {
-  errors?: string[];
-};
+import type { JournalFormState } from "@/lib/journal/form";
 
 // 仕訳入力フォームの Server Action。useActionState から呼ばれるため、
 // 第1引数に前回の state を受け取る。検証 NG なら errors を返し、
 // 成功時はダッシュボードへリダイレクトする。
 export async function createEntryAction(
-  _prevState: NewEntryState | undefined,
+  _prevState: JournalFormState | undefined,
   formData: FormData,
-): Promise<NewEntryState | undefined> {
+): Promise<JournalFormState | undefined> {
   // フォームが認証ページ内でも、Server Action 側で必ず認証を確認する。
   const session = await verifySession();
   const userId = Number(session.user.id);
