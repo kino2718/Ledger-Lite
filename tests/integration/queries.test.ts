@@ -7,6 +7,8 @@ vi.mock("server-only", () => ({}));
 import { prisma } from "@/lib/prisma";
 import {
   getBalanceLines,
+  getJournalEntries,
+  getJournalEntry,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
 import type { AccountType, Side } from "@/lib/ledger/types";
@@ -32,7 +34,12 @@ function createEntry(
   userId: number,
   entryDate: string,
   description: string | null,
-  lines: { accountId: number; side: Side; amount: number }[],
+  lines: {
+    accountId: number;
+    subAccountId?: number | null;
+    side: Side;
+    amount: number;
+  }[],
 ) {
   return prisma.journalEntry.create({
     data: {
@@ -190,5 +197,138 @@ describe("getRecentJournalEntries", () => {
     const recent = await getRecentJournalEntries(alice.id);
 
     expect(recent).toEqual([]);
+  });
+});
+
+// --- getJournalEntries（一覧） -------------------------------------------------
+
+describe("getJournalEntries", () => {
+  test("全件を取引日の新しい順に、借方合計を total として返す", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2026-06-01", "古い取引", [
+      { accountId: cash.id, side: "debit", amount: 1000 },
+      { accountId: sales.id, side: "credit", amount: 1000 },
+    ]);
+    await createEntry(alice.id, "2026-06-18", "新しい取引", [
+      { accountId: cash.id, side: "debit", amount: 5000 },
+      { accountId: sales.id, side: "credit", amount: 5000 },
+    ]);
+
+    const entries = await getJournalEntries(alice.id);
+
+    // 件数制限なしで全件。新しい順。
+    expect(entries.map((e) => e.description)).toEqual([
+      "新しい取引",
+      "古い取引",
+    ]);
+    expect(entries[0].total).toBe(5000);
+  });
+
+  test("各仕訳の明細を科目名・補助科目名つきで lineNo 順に含める", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const utility = await createAccount(alice.id, "401", "水道光熱費", "expense");
+    const electric = await prisma.subAccount.create({
+      data: { accountId: utility.id, name: "電気" },
+    });
+    await createEntry(alice.id, "2026-06-12", "電気料金", [
+      {
+        accountId: utility.id,
+        subAccountId: electric.id,
+        side: "debit",
+        amount: 8000,
+      },
+      { accountId: cash.id, side: "credit", amount: 8000 },
+    ]);
+
+    const [entry] = await getJournalEntries(alice.id);
+
+    expect(entry.lines).toEqual([
+      {
+        side: "debit",
+        amount: 8000,
+        accountName: "水道光熱費",
+        subAccountName: "電気",
+      },
+      {
+        side: "credit",
+        amount: 8000,
+        accountName: "現金",
+        subAccountName: null,
+      },
+    ]);
+  });
+
+  test("他ユーザーの仕訳は含めない", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const bobCash = await createAccount(bob.id, "100", "現金", "asset");
+    const bobSales = await createAccount(bob.id, "400", "売上高", "revenue");
+    await createEntry(bob.id, "2026-06-18", "bob の取引", [
+      { accountId: bobCash.id, side: "debit", amount: 1000 },
+      { accountId: bobSales.id, side: "credit", amount: 1000 },
+    ]);
+
+    expect(await getJournalEntries(alice.id)).toEqual([]);
+  });
+});
+
+// --- getJournalEntry（詳細） ---------------------------------------------------
+
+describe("getJournalEntry", () => {
+  test("明細を lineNo 昇順で含めて 1 件返す", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const utility = await createAccount(alice.id, "401", "水道光熱費", "expense");
+    const electric = await prisma.subAccount.create({
+      data: { accountId: utility.id, name: "電気" },
+    });
+    const entry = await createEntry(alice.id, "2026-06-12", "電気料金", [
+      {
+        accountId: utility.id,
+        subAccountId: electric.id,
+        side: "debit",
+        amount: 8000,
+      },
+      { accountId: cash.id, side: "credit", amount: 8000 },
+    ]);
+
+    const result = await getJournalEntry(alice.id, entry.id);
+
+    expect(result).not.toBeNull();
+    expect(result).toMatchObject({
+      id: entry.id,
+      entryDate: "2026-06-12",
+      description: "電気料金",
+      lines: [
+        {
+          accountId: utility.id,
+          subAccountId: electric.id,
+          side: "debit",
+          amount: 8000,
+        },
+        { accountId: cash.id, subAccountId: null, side: "credit", amount: 8000 },
+      ],
+    });
+  });
+
+  test("他ユーザーの仕訳は取得できない（null）", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const bobCash = await createAccount(bob.id, "100", "現金", "asset");
+    const bobSales = await createAccount(bob.id, "400", "売上高", "revenue");
+    const entry = await createEntry(bob.id, "2026-06-18", "bob の取引", [
+      { accountId: bobCash.id, side: "debit", amount: 1000 },
+      { accountId: bobSales.id, side: "credit", amount: 1000 },
+    ]);
+
+    expect(await getJournalEntry(alice.id, entry.id)).toBeNull();
+  });
+
+  test("存在しない ID は null", async () => {
+    const alice = await createUser("alice@example.com");
+    expect(await getJournalEntry(alice.id, 9999)).toBeNull();
   });
 });
