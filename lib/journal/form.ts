@@ -10,6 +10,49 @@ export type JournalFormState = {
   errors?: string[];
 };
 
+// フォーム入力中の片側（借方 or 貸方）の値。入力中は文字列で保持する。
+export type SideInput = {
+  accountId: string;
+  subAccountId: string;
+  amount: string;
+};
+
+// 借方・貸方を左右に並べた 1 組。片側だけ埋まることもある。
+export type Pair = {
+  debit: SideInput;
+  credit: SideInput;
+};
+
+const emptySide = (): SideInput => ({
+  accountId: "",
+  subAccountId: "",
+  amount: "",
+});
+
+// 1 明細をフォームの片側入力に変換する（数値→文字列、補助科目の null→""）。
+function toSideInput(line: JournalLineInput): SideInput {
+  return {
+    accountId: String(line.accountId),
+    subAccountId: line.subAccountId === null ? "" : String(line.subAccountId),
+    amount: String(line.amount),
+  };
+}
+
+/**
+ * 既存明細を編集フォーム用の組（Pair）に変換する。parseJournalEntryForm の逆向き。
+ * 借方・貸方をそれぞれ上から詰め、件数が違えば多いほうに合わせて空側で埋める。
+ * 組の対応は表示上のもので、保存時に lineNo を振り直すため意味は変わらない。
+ */
+export function linesToPairs(lines: JournalLineInput[]): Pair[] {
+  const debits = lines.filter((line) => line.side === "debit");
+  const credits = lines.filter((line) => line.side === "credit");
+  const rowCount = Math.max(debits.length, credits.length);
+  return Array.from({ length: rowCount }, (_, i) => ({
+    debit: debits[i] ? toSideInput(debits[i]) : emptySide(),
+    credit: credits[i] ? toSideInput(credits[i]) : emptySide(),
+  }));
+}
+
 export function parseJournalEntryForm(formData: FormData): JournalEntryInput {
   const entryDate = String(formData.get("entryDate") ?? "");
   const descriptionRaw = String(formData.get("description") ?? "");

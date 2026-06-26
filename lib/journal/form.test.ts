@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { parseJournalEntryForm } from "./form";
+import { linesToPairs, parseJournalEntryForm } from "./form";
+import type { JournalLineInput } from "./validation";
 
 // テスト用に FormData を組み立てるヘルパー。
 function formOf(fields: Record<string, string>): FormData {
@@ -142,5 +143,81 @@ describe("parseJournalEntryForm", () => {
   test("pairCount が無い／0 なら明細は空", () => {
     const result = parseJournalEntryForm(formOf({ entryDate: "2026-06-23" }));
     expect(result.lines).toEqual([]);
+  });
+});
+
+// 数値の明細から、テストで見やすい片側入力ヘルパー。
+function line(
+  side: "debit" | "credit",
+  accountId: number,
+  amount: number,
+  subAccountId: number | null = null,
+): JournalLineInput {
+  return { accountId, subAccountId, side, amount };
+}
+
+describe("linesToPairs", () => {
+  test("借方1・貸方1 は 1 組にまとまり、数値は文字列になる", () => {
+    const pairs = linesToPairs([
+      line("debit", 1, 1000),
+      line("credit", 8, 1000),
+    ]);
+    expect(pairs).toEqual([
+      {
+        debit: { accountId: "1", subAccountId: "", amount: "1000" },
+        credit: { accountId: "8", subAccountId: "", amount: "1000" },
+      },
+    ]);
+  });
+
+  test("借方・貸方をそれぞれ上から詰める（入力順に依存しない）", () => {
+    // 借方2件・貸方1件が、借方→借方→貸方の順で渡ってきても上詰めで組む。
+    const pairs = linesToPairs([
+      line("debit", 1, 700),
+      line("debit", 2, 300),
+      line("credit", 8, 1000),
+    ]);
+    expect(pairs).toEqual([
+      {
+        debit: { accountId: "1", subAccountId: "", amount: "700" },
+        credit: { accountId: "8", subAccountId: "", amount: "1000" },
+      },
+      {
+        debit: { accountId: "2", subAccountId: "", amount: "300" },
+        credit: { accountId: "", subAccountId: "", amount: "" },
+      },
+    ]);
+  });
+
+  test("件数の少ない側は空で埋める（行数は多いほうに合わせる）", () => {
+    const pairs = linesToPairs([
+      line("debit", 1, 1000),
+      line("credit", 8, 600),
+      line("credit", 9, 400),
+    ]);
+    expect(pairs).toHaveLength(2);
+    expect(pairs[1].debit).toEqual({
+      accountId: "",
+      subAccountId: "",
+      amount: "",
+    });
+    expect(pairs[1].credit).toEqual({
+      accountId: "9",
+      subAccountId: "",
+      amount: "400",
+    });
+  });
+
+  test("補助科目は値があれば文字列、null なら空文字", () => {
+    const pairs = linesToPairs([
+      line("debit", 10, 8000, 5),
+      line("credit", 1, 8000, null),
+    ]);
+    expect(pairs[0].debit.subAccountId).toBe("5");
+    expect(pairs[0].credit.subAccountId).toBe("");
+  });
+
+  test("明細が空なら組も空", () => {
+    expect(linesToPairs([])).toEqual([]);
   });
 });

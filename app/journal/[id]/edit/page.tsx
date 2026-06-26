@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/session";
 import { getAccountOptions, getJournalEntry } from "@/lib/journal/queries";
 import { JournalForm } from "../../JournalForm";
-import type { Pair } from "../../JournalForm";
+import { linesToPairs } from "@/lib/journal/form";
 import { updateEntryAction } from "./actions";
 
 export default async function EditJournalEntryPage({
@@ -28,23 +28,8 @@ export default async function EditJournalEntryPage({
   // 他ユーザーの仕訳や存在しない ID は null → 404。
   if (!entry) notFound();
 
-  // 既存明細を借方・貸方それぞれ上から詰めて組にする（科目を左右で見比べやすい）。
-  // 組の対応は表示上のものだけで、保存時に lineNo を振り直すため意味は変わらない。
-  type LineDetail = (typeof entry.lines)[number];
-  const emptySide = { accountId: "", subAccountId: "", amount: "" };
-  const toSideInput = (line: LineDetail) => ({
-    accountId: String(line.accountId),
-    subAccountId: line.subAccountId === null ? "" : String(line.subAccountId),
-    amount: String(line.amount),
-  });
-  const debits = entry.lines.filter((line) => line.side === "debit");
-  const credits = entry.lines.filter((line) => line.side === "credit");
-  // 借方・貸方で件数が違っても、多いほうに合わせて行数を確保する。
-  const rowCount = Math.max(debits.length, credits.length);
-  const initialPairs: Pair[] = Array.from({ length: rowCount }, (_, i) => ({
-    debit: debits[i] ? toSideInput(debits[i]) : { ...emptySide },
-    credit: credits[i] ? toSideInput(credits[i]) : { ...emptySide },
-  }));
+  // 既存明細を編集フォーム用の組に変換する（借方・貸方を上から詰める。詳細は linesToPairs）。
+  const initialPairs = linesToPairs(entry.lines);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">

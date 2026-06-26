@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountOption } from "@/lib/journal/queries";
 import { JournalForm } from "./JournalForm";
-import type { Pair } from "./JournalForm";
+import type { Pair } from "@/lib/journal/form";
 
 // JournalForm は action を prop で受け取るため、テストではモックを渡す
 // （server-only / Prisma を芋づるに読み込まない）。

@@ -3,27 +3,14 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { AccountOption } from "@/lib/journal/queries";
-import type { JournalFormState } from "@/lib/journal/form";
-
-// 入力中は文字列で保持する。借方・貸方それぞれが 1 つの side を持つ。
-export type SideInput = {
-  accountId: string;
-  subAccountId: string;
-  amount: string;
-};
-
-// 借方・貸方を左右に並べた 1 組。片側だけ入力されることもある。
-export type Pair = {
-  debit: SideInput;
-  credit: SideInput;
-};
+import type { JournalFormState, Pair, SideInput } from "@/lib/journal/form";
 
 const emptySide = (): SideInput => ({
   accountId: "",
   subAccountId: "",
   amount: "",
 });
-export const emptyPair = (): Pair => ({
+const emptyPair = (): Pair => ({
   debit: emptySide(),
   credit: emptySide(),
 });
