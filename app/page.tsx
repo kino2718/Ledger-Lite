@@ -100,12 +100,20 @@ export default async function Home() {
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             ダッシュボード
           </h2>
-          <Link
-            href="/journal/new"
-            className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-          >
-            新規仕訳 +
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/journal"
+              className="rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              仕訳一覧
+            </Link>
+            <Link
+              href="/journal/new"
+              className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            >
+              新規仕訳 +
+            </Link>
+          </div>
         </div>
 
         {/* 今月の損益 */}
@@ -177,9 +185,19 @@ export default async function Home() {
 
           {/* 最近の仕訳 */}
           <section className="rounded-2xl border border-black/8 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-950">
-            <h3 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              最近の仕訳
-            </h3>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                最近の仕訳
+              </h3>
+              {hasEntries && (
+                <Link
+                  href="/journal"
+                  className="text-xs text-zinc-500 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
+                >
+                  すべて見る →
+                </Link>
+              )}
+            </div>
             {!hasEntries ? (
               <p className="py-6 text-center text-sm text-zinc-400">
                 仕訳はまだありません。「新規仕訳 +」から登録できます。
@@ -189,17 +207,22 @@ export default async function Home() {
                 {recent.map((entry) => (
                   <li
                     key={entry.id}
-                    className="flex items-center justify-between gap-3 border-b border-black/5 py-2 last:border-0 dark:border-white/5"
+                    className="border-b border-black/5 last:border-0 dark:border-white/5"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-zinc-800 dark:text-zinc-200">
-                        {entry.description ?? "（摘要なし）"}
-                      </p>
-                      <p className="text-xs text-zinc-400">{entry.entryDate}</p>
-                    </div>
-                    <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">
-                      {yen(entry.total)}
-                    </span>
+                    <Link
+                      href={`/journal/${entry.id}/edit`}
+                      className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-black/4 dark:hover:bg-white/6"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-zinc-800 dark:text-zinc-200">
+                          {entry.description ?? "（摘要なし）"}
+                        </p>
+                        <p className="text-xs text-zinc-400">{entry.entryDate}</p>
+                      </div>
+                      <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {yen(entry.total)}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
