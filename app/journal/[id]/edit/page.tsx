@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/session";
 import { getAccountOptions, getJournalEntry } from "@/lib/journal/queries";
 import { JournalForm } from "../../JournalForm";
+import { DeleteEntryButton } from "../../DeleteEntryButton";
 import { linesToPairs } from "@/lib/journal/form";
-import { updateEntryAction } from "./actions";
+import { deleteEntryAction, updateEntryAction } from "./actions";
 
 export default async function EditJournalEntryPage({
   params,
@@ -58,6 +59,15 @@ export default async function EditJournalEntryPage({
           submitLabel="更新"
           cancelHref="/journal"
         />
+
+        {/* 削除はフォームと独立した操作なので、区切って下部に配置する。 */}
+        <div className="mt-8 flex items-center justify-between border-t border-black/8 pt-6 dark:border-white/10">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            この仕訳を削除します。
+          </p>
+          {/* 対象 ID を結び付けた削除アクションを渡す。 */}
+          <DeleteEntryButton action={deleteEntryAction.bind(null, id)} />
+        </div>
       </main>
     </div>
   );
