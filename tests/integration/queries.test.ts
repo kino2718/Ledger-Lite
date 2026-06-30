@@ -9,6 +9,7 @@ import {
   getBalanceLines,
   getJournalEntries,
   getJournalEntry,
+  getLedgerLines,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
 import type { AccountType, Side } from "@/lib/ledger/types";
@@ -272,6 +273,136 @@ describe("getJournalEntries", () => {
     ]);
 
     expect(await getJournalEntries(alice.id)).toEqual([]);
+  });
+});
+
+// --- getLedgerLines（元帳） ----------------------------------------------------
+
+describe("getLedgerLines", () => {
+  test("対象科目の明細だけを取引日順に、相手科目つきで返す", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    const utility = await createAccount(alice.id, "401", "水道光熱費", "expense");
+    // 現金が登場する仕訳を 2 件（日付の逆順で登録して並べ替えを確認）。
+    await createEntry(alice.id, "2026-06-20", "電気料金", [
+      { accountId: utility.id, side: "debit", amount: 8000 },
+      { accountId: cash.id, side: "credit", amount: 8000 },
+    ]);
+    await createEntry(alice.id, "2026-06-10", "現金売上", [
+      { accountId: cash.id, side: "debit", amount: 30000 },
+      { accountId: sales.id, side: "credit", amount: 30000 },
+    ]);
+
+    const lines = await getLedgerLines(alice.id, cash.id);
+
+    expect(lines).toHaveLength(2);
+    // 取引日の昇順。
+    expect(lines.map((l) => l.entryDate)).toEqual(["2026-06-10", "2026-06-20"]);
+    expect(lines[0]).toMatchObject({
+      entryDate: "2026-06-10",
+      description: "現金売上",
+      side: "debit",
+      amount: 30000,
+      siblings: [{ accountId: sales.id, accountName: "売上高" }],
+    });
+    expect(lines[1]).toMatchObject({
+      side: "credit",
+      amount: 8000,
+      siblings: [{ accountId: utility.id, accountName: "水道光熱費" }],
+    });
+  });
+
+  test("複数の相手科目は siblings に並ぶ（諸口の元になる）", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    const misc = await createAccount(alice.id, "402", "雑収入", "revenue");
+    await createEntry(alice.id, "2026-06-15", "売上と雑収入", [
+      { accountId: cash.id, side: "debit", amount: 12000 },
+      { accountId: sales.id, side: "credit", amount: 10000 },
+      { accountId: misc.id, side: "credit", amount: 2000 },
+    ]);
+
+    const [line] = await getLedgerLines(alice.id, cash.id);
+
+    expect(line.siblings).toEqual([
+      { accountId: sales.id, accountName: "売上高" },
+      { accountId: misc.id, accountName: "雑収入" },
+    ]);
+  });
+
+  test("subAccountId を渡すとその補助科目の明細だけに絞る（補助元帳）", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const utility = await createAccount(alice.id, "401", "水道光熱費", "expense");
+    const electric = await prisma.subAccount.create({
+      data: { accountId: utility.id, name: "電気" },
+    });
+    const water = await prisma.subAccount.create({
+      data: { accountId: utility.id, name: "水道" },
+    });
+    await createEntry(alice.id, "2026-06-12", "電気料金", [
+      { accountId: utility.id, subAccountId: electric.id, side: "debit", amount: 8000 },
+      { accountId: cash.id, side: "credit", amount: 8000 },
+    ]);
+    await createEntry(alice.id, "2026-06-13", "水道料金", [
+      { accountId: utility.id, subAccountId: water.id, side: "debit", amount: 3000 },
+      { accountId: cash.id, side: "credit", amount: 3000 },
+    ]);
+
+    const electricOnly = await getLedgerLines(alice.id, utility.id, electric.id);
+
+    expect(electricOnly).toHaveLength(1);
+    expect(electricOnly[0]).toMatchObject({
+      description: "電気料金",
+      amount: 8000,
+      siblings: [{ accountId: cash.id, accountName: "現金" }],
+    });
+  });
+
+  test("他ユーザーの明細は含めない", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const aliceCash = await createAccount(alice.id, "100", "現金", "asset");
+    const aliceSales = await createAccount(alice.id, "400", "売上高", "revenue");
+    const bobCash = await createAccount(bob.id, "100", "現金", "asset");
+    const bobSales = await createAccount(bob.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2026-06-18", "alice の売上", [
+      { accountId: aliceCash.id, side: "debit", amount: 30000 },
+      { accountId: aliceSales.id, side: "credit", amount: 30000 },
+    ]);
+    await createEntry(bob.id, "2026-06-18", "bob の売上", [
+      { accountId: bobCash.id, side: "debit", amount: 99999 },
+      { accountId: bobSales.id, side: "credit", amount: 99999 },
+    ]);
+
+    const lines = await getLedgerLines(alice.id, aliceCash.id);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0].amount).toBe(30000);
+  });
+
+  test("period で取引日の範囲に絞る", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2026-05-31", "5月の売上", [
+      { accountId: cash.id, side: "debit", amount: 10000 },
+      { accountId: sales.id, side: "credit", amount: 10000 },
+    ]);
+    await createEntry(alice.id, "2026-06-15", "6月の売上", [
+      { accountId: cash.id, side: "debit", amount: 20000 },
+      { accountId: sales.id, side: "credit", amount: 20000 },
+    ]);
+
+    const june = await getLedgerLines(alice.id, cash.id, undefined, {
+      from: "2026-06-01",
+      to: "2026-06-30",
+    });
+
+    expect(june).toHaveLength(1);
+    expect(june[0].amount).toBe(20000);
   });
 });
 

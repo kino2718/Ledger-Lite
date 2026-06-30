@@ -4,6 +4,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AccountType, BalanceLine, Side } from "@/lib/ledger/types";
+import type { LedgerSourceLine } from "@/lib/ledger/ledger";
 
 // 取引日（YYYY-MM-DD 文字列）の範囲指定。辞書順＝日付順なので文字列比較で足りる。
 export type DateRange = { from?: string; to?: string };
@@ -86,6 +87,100 @@ export async function getBalanceLines(
     accountType: line.account.accountType,
     side: line.side,
     amount: line.amount,
+  }));
+}
+
+/**
+ * 総勘定元帳・補助元帳用に、ある科目（必要なら補助科目）の明細を取引日順で取得する。
+ * 1 明細＝元帳の 1 行。相手科目を出せるよう、同じ仕訳の「対象科目以外の明細」を
+ * siblings として添える。subAccountId を渡すとその補助科目の明細だけに絞る（補助元帳）。
+ * 返り値は buildLedgerRows（lib/ledger/ledger.ts）にそのまま渡せる形。
+ */
+// この入れ子の select は「ほしい結果の形」を宣言しているだけで、Prisma は
+// 1 階層 = 1 クエリの平らな SQL（合計 4 本）に分けて実行し、ID で突き合わせて
+// 束ね直す。各階層は accountId / entryId の索引に乗るので N+1 にはならない。
+// 実際に発行される SQL（読みやすく整理。IN(...) には前段の結果 ID が入る）：
+//
+//   -- 1) 元帳の各行となる、対象科目の明細を取る
+//   SELECT id, entryId, side, amount
+//   FROM JournalLine
+//   JOIN JournalEntry j0 ON j0.id = JournalLine.entryId   -- where の entry:{...} 用
+//   WHERE JournalLine.accountId = ?                        -- 対象科目
+//     AND j0.userId = ? AND j0.entryDate >= ? AND j0.entryDate <= ?
+//   ORDER BY j0.entryDate, JournalLine.entryId, JournalLine.lineNo;
+//
+//   -- 2) その明細たちの親の仕訳をまとめて取る（entryDate / description）
+//   SELECT id, entryDate, description
+//   FROM JournalEntry WHERE id IN (1 の entryId たち);
+//
+//   -- 3) 同じ仕訳の対象科目以外の明細＝相手科目をまとめて取る
+//   SELECT id, accountId, entryId
+//   FROM JournalLine
+//   WHERE accountId <> ? AND entryId IN (1 の entryId たち)
+//   ORDER BY lineNo;
+//
+//   -- 4) 3 で出た科目の名前をまとめて取る
+//   SELECT id, name FROM Account WHERE id IN (3 の accountId たち);
+export async function getLedgerLines(
+  userId: number,
+  accountId: number,
+  subAccountId?: number,
+  period?: DateRange,
+): Promise<LedgerSourceLine[]> {
+  const lines = await prisma.journalLine.findMany({
+    // ── 1) 元帳の各行となる、対象科目の明細を選ぶ ──
+    where: {
+      accountId,
+      // 補助科目の指定があるときだけ絞る（未指定なら全補助科目を含む）。
+      ...(subAccountId !== undefined ? { subAccountId } : {}),
+      entry: {
+        userId,
+        entryDate: {
+          ...(period?.from ? { gte: period.from } : {}),
+          ...(period?.to ? { lte: period.to } : {}),
+        },
+      },
+    },
+    // 取引日の昇順。同日内は仕訳・行の登録順で安定させる（残高の積み上げ順）。
+    orderBy: [
+      { entry: { entryDate: "asc" } },
+      { entryId: "asc" },
+      { lineNo: "asc" },
+    ],
+    select: {
+      entryId: true,
+      side: true,
+      amount: true,
+      // ── 2) 各明細の親の仕訳から日付・摘要を引く ──
+      entry: {
+        select: {
+          entryDate: true,
+          description: true,
+          // ── 3) 相手科目の判定用に、同じ仕訳の対象科目以外の明細を集める ──
+          lines: {
+            where: { accountId: { not: accountId } },
+            orderBy: { lineNo: "asc" },
+            select: {
+              accountId: true,
+              // ── 4) 相手科目の名前を引く ──
+              account: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return lines.map((line) => ({
+    entryId: line.entryId,
+    entryDate: line.entry.entryDate,
+    description: line.entry.description,
+    side: line.side,
+    amount: line.amount,
+    siblings: line.entry.lines.map((sibling) => ({
+      accountId: sibling.accountId,
+      accountName: sibling.account.name,
+    })),
   }));
 }
 
