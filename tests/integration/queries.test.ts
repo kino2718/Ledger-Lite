@@ -9,6 +9,7 @@ import {
   getBalanceLines,
   getJournalEntries,
   getJournalEntry,
+  getLedgerAccount,
   getLedgerLines,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
@@ -403,6 +404,42 @@ describe("getLedgerLines", () => {
 
     expect(june).toHaveLength(1);
     expect(june[0].amount).toBe(20000);
+  });
+});
+
+// --- getLedgerAccount（元帳の対象科目） ----------------------------------------
+
+describe("getLedgerAccount", () => {
+  test("科目を補助科目つきで返す", async () => {
+    const alice = await createUser("alice@example.com");
+    const utility = await createAccount(alice.id, "401", "水道光熱費", "expense");
+    const electric = await prisma.subAccount.create({
+      data: { accountId: utility.id, name: "電気" },
+    });
+    const water = await prisma.subAccount.create({
+      data: { accountId: utility.id, name: "水道" },
+    });
+
+    const result = await getLedgerAccount(alice.id, utility.id);
+
+    expect(result).toEqual({
+      id: utility.id,
+      code: "401",
+      name: "水道光熱費",
+      accountType: "expense",
+      subAccounts: [
+        { id: electric.id, name: "電気" },
+        { id: water.id, name: "水道" },
+      ],
+    });
+  });
+
+  test("他ユーザーの科目は取得できない（null）", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const bobCash = await createAccount(bob.id, "100", "現金", "asset");
+
+    expect(await getLedgerAccount(alice.id, bobCash.id)).toBeNull();
   });
 });
 

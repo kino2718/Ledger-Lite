@@ -90,6 +90,40 @@ export async function getBalanceLines(
   }));
 }
 
+// 元帳の見出し・補助元帳の絞り込み用に、科目 1 件とその補助科目を表す。
+export type LedgerAccount = {
+  id: number;
+  code: string | null;
+  name: string;
+  accountType: AccountType;
+  // 補助元帳の絞り込みチップ用。過去の明細を辿れるよう無効な補助科目も含める。
+  subAccounts: { id: number; name: string }[];
+};
+
+/**
+ * 元帳の対象となる科目を 1 件、補助科目つきで取得する。所有者でなければ null。
+ * accountType は残高の積み上げ方向（buildLedgerRows）に使う。
+ */
+export async function getLedgerAccount(
+  userId: number,
+  accountId: number,
+): Promise<LedgerAccount | null> {
+  return prisma.account.findFirst({
+    // id だけでなく userId も条件にして所有スコープを担保する。
+    where: { id: accountId, userId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      accountType: true,
+      subAccounts: {
+        orderBy: { id: "asc" },
+        select: { id: true, name: true },
+      },
+    },
+  });
+}
+
 /**
  * 総勘定元帳・補助元帳用に、ある科目（必要なら補助科目）の明細を取引日順で取得する。
  * 1 明細＝元帳の 1 行。相手科目を出せるよう、同じ仕訳の「対象科目以外の明細」を
