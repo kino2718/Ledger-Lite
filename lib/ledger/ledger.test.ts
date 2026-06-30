@@ -49,16 +49,16 @@ describe("counterAccountLabel", () => {
 
 describe("buildLedgerRows", () => {
   test("空配列なら空配列", () => {
-    expect(buildLedgerRows({ lines: [], accountType: "asset" })).toEqual([]);
+    expect(buildLedgerRows({ lines: [], normalSide: "debit" })).toEqual([]);
   });
 
-  test("資産科目は借方で残高が増え、貸方で減る（残高を積み上げる）", () => {
+  test("借方科目は借方で残高が増え、貸方で減る（残高を積み上げる）", () => {
     const rows = buildLedgerRows({
       lines: [
         src({ side: "debit", amount: 1000 }),
         src({ side: "credit", amount: 300 }),
       ],
-      accountType: "asset",
+      normalSide: "debit",
     });
     expect(rows.map((r) => r.balance)).toEqual([1000, 700]);
     // 借方明細は借方列に金額、貸方列は 0（その逆も同様）。
@@ -66,21 +66,33 @@ describe("buildLedgerRows", () => {
     expect(rows[1]).toMatchObject({ debit: 0, credit: 300 });
   });
 
-  test("収益科目は貸方で残高が増え、借方で減る", () => {
+  test("貸方科目は貸方で残高が増え、借方で減る", () => {
     const rows = buildLedgerRows({
       lines: [
         src({ side: "credit", amount: 150000 }),
         src({ side: "debit", amount: 5000 }),
       ],
-      accountType: "revenue",
+      normalSide: "credit",
     });
     expect(rows.map((r) => r.balance)).toEqual([150000, 145000]);
+  });
+
+  test("評価勘定（事業主貸など）は normalSide=debit なら借方で正に積み上がる", () => {
+    // 純資産でも通常残高が借方なので、借方計上が残高を増やす。
+    const rows = buildLedgerRows({
+      lines: [
+        src({ side: "debit", amount: 10000 }),
+        src({ side: "debit", amount: 3000 }),
+      ],
+      normalSide: "debit",
+    });
+    expect(rows.map((r) => r.balance)).toEqual([10000, 13000]);
   });
 
   test("openingBalance（期首繰越）から積み上げる", () => {
     const rows = buildLedgerRows({
       lines: [src({ side: "debit", amount: 1000 })],
-      accountType: "asset",
+      normalSide: "debit",
       openingBalance: 5000,
     });
     expect(rows[0].balance).toBe(6000);
@@ -107,7 +119,7 @@ describe("buildLedgerRows", () => {
           ],
         }),
       ],
-      accountType: "expense",
+      normalSide: "debit",
     });
     expect(rows[0]).toMatchObject({
       entryId: 10,

@@ -2,7 +2,7 @@
 // 時系列に並べて残高を積み上げる純粋関数。DB には依存しない。
 // 残高の向き（通常残高方向）は signedAmount に委ねて一元化する。
 
-import type { AccountType, Side } from "./types";
+import type { Side } from "./types";
 import { signedAmount } from "./balance";
 
 // 相手科目を求めるための、同じ仕訳の「他の明細」の科目。
@@ -53,24 +53,22 @@ export function counterAccountLabel(siblings: LedgerSibling[]): string {
 /**
  * 日付順に並んだ明細から元帳の行を組み立てる。
  * openingBalance（期首繰越）から始めて、各明細を通常残高方向で積み上げる。
- * 借方科目（資産・費用）は借方で残高が増え、貸方科目（負債・純資産・収益）は
- * 貸方で増える。
+ * normalSide が借方の科目は借方で残高が増え、貸方の科目は貸方で増える。
+ * 事業主貸のような評価勘定も normalSide で正しく扱える。
  */
 export function buildLedgerRows({
   lines,
-  accountType,
+  normalSide,
   openingBalance = 0,
 }: {
   lines: LedgerSourceLine[];
-  accountType: AccountType;
+  normalSide: Side;
   openingBalance?: number;
 }): LedgerRow[] {
   let balance = openingBalance;
   return lines.map((line) => {
-    // accountId は符号計算に使わないのでダミーで足りる。
     balance += signedAmount({
-      accountId: 0,
-      accountType,
+      normalSide,
       side: line.side,
       amount: line.amount,
     });

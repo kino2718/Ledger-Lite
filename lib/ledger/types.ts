@@ -11,9 +11,11 @@ export type AccountType =
 export type Side = "debit" | "credit";
 
 // 残高集計に必要な最小限の仕訳明細。
+// accountType は損益などのグルーピング用、normalSide は符号（通常残高方向）の判定用。
 export type BalanceLine = {
   accountId: number;
   accountType: AccountType;
+  normalSide: Side;
   side: Side;
   amount: number;
 };

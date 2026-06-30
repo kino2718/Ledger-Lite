@@ -1,14 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import type { AccountType } from "../generated/prisma/enums";
+import { normalBalanceSide } from "@/lib/ledger/balance";
+import type { AccountType, EntrySide } from "../generated/prisma/enums";
 
 // 初期投入する勘定科目。
 // code は分類ごとに百の位を割り当てた連番（asset=100番台 / liability=200番台 /
 // equity=300番台 / revenue=400番台 / expense=500番台）。各分類内は登場順に +1 する。
 // 補助科目は用途区分のみとし、銀行名・取引先名など個人を特定する情報は持たない。
+// normalSide は通常残高の向き。未指定なら分類の既定（normalBalanceSide）を使い、
+// 事業主貸のような評価勘定だけ明示的に上書きする。
 type AccountSeed = {
   code: string;
   name: string;
   accountType: AccountType;
+  normalSide?: EntrySide;
   subAccounts?: string[];
 };
 
@@ -17,7 +21,8 @@ const ACCOUNTS: AccountSeed[] = [
   { code: "101", name: "普通預金", accountType: "asset" },
   { code: "102", name: "売掛金", accountType: "asset" },
   { code: "103", name: "預け金", accountType: "asset" },
-  { code: "300", name: "事業主貸", accountType: "equity" },
+  // 事業主貸は純資産だが評価勘定のため通常残高は借方（引出しを借方に積む）。
+  { code: "300", name: "事業主貸", accountType: "equity", normalSide: "debit" },
   { code: "301", name: "事業主借", accountType: "equity" },
   { code: "302", name: "元入金", accountType: "equity" },
   { code: "400", name: "売上高", accountType: "revenue" },
@@ -42,14 +47,17 @@ const ACCOUNTS: AccountSeed[] = [
 
 async function seedAccounts(userId: number) {
   for (const a of ACCOUNTS) {
+    // 未指定の科目は分類から既定の向きを決める。
+    const normalSide = a.normalSide ?? normalBalanceSide(a.accountType);
     const account = await prisma.account.upsert({
       where: { userId_code: { userId, code: a.code } },
-      update: { name: a.name, accountType: a.accountType },
+      update: { name: a.name, accountType: a.accountType, normalSide },
       create: {
         userId,
         code: a.code,
         name: a.name,
         accountType: a.accountType,
+        normalSide,
       },
     });
 

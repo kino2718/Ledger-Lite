@@ -40,6 +40,9 @@ model Account {
   code        String?
   name        String
   accountType AccountType
+  // 通常残高の向き（借方科目／貸方科目）。既定は accountType から決まるが、
+  // 事業主貸のような評価勘定は分類の既定と逆向きになるため科目ごとに保持する。
+  normalSide  EntrySide
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

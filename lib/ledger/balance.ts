@@ -12,16 +12,22 @@ import type {
 // 借方を通常残高とする科目分類。
 const DEBIT_NORMAL: ReadonlySet<AccountType> = new Set(["asset", "expense"]);
 
-/** 科目分類の通常残高がどちら側か。 */
+/**
+ * 科目分類から決まる「既定の」通常残高の向き。科目作成時の初期値に使う。
+ * 事業主貸のような評価勘定はこの既定と逆向きになるため、実際の符号判定は
+ * 科目ごとの normalSide（signedAmount の引数）を見る。
+ */
 export function normalBalanceSide(type: AccountType): Side {
   return DEBIT_NORMAL.has(type) ? "debit" : "credit";
 }
 
 /** 1 行を通常残高方向で符号付き金額にする（通常側=正、逆側=負）。 */
-export function signedAmount(line: BalanceLine): number {
-  return line.side === normalBalanceSide(line.accountType)
-    ? line.amount
-    : -line.amount;
+export function signedAmount(line: {
+  side: Side;
+  normalSide: Side;
+  amount: number;
+}): number {
+  return line.side === line.normalSide ? line.amount : -line.amount;
 }
 
 /** 科目ごとの残高を集計する。残高 0 の科目も残し、初出順を保つ。 */

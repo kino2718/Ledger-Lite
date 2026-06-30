@@ -20,10 +20,22 @@ async function setup() {
     data: { email: "alice@example.com", passwordHash: "hash" },
   });
   const cash = await prisma.account.create({
-    data: { userId: user.id, code: "100", name: "現金", accountType: "asset" },
+    data: {
+      userId: user.id,
+      code: "100",
+      name: "現金",
+      accountType: "asset",
+      normalSide: "debit",
+    },
   });
   const sales = await prisma.account.create({
-    data: { userId: user.id, code: "400", name: "売上高", accountType: "revenue" },
+    data: {
+      userId: user.id,
+      code: "400",
+      name: "売上高",
+      accountType: "revenue",
+      normalSide: "credit",
+    },
   });
   const utility = await prisma.account.create({
     data: {
@@ -31,6 +43,7 @@ async function setup() {
       code: "401",
       name: "水道光熱費",
       accountType: "expense",
+      normalSide: "debit",
       subAccounts: { create: [{ name: "電気" }] },
     },
     include: { subAccounts: true },

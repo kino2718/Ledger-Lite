@@ -13,6 +13,7 @@ import {
   getLedgerLines,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
+import { normalBalanceSide } from "@/lib/ledger/balance";
 import type { AccountType, Side } from "@/lib/ledger/types";
 
 // --- テスト用のデータ作成ヘルパー --------------------------------------------
@@ -26,9 +27,11 @@ function createAccount(
   code: string,
   name: string,
   accountType: AccountType,
+  // 未指定なら分類の既定の向き。評価勘定のテストでは明示的に上書きする。
+  normalSide: Side = normalBalanceSide(accountType),
 ) {
   return prisma.account.create({
-    data: { userId, code, name, accountType },
+    data: { userId, code, name, accountType, normalSide },
   });
 }
 
@@ -73,12 +76,14 @@ describe("getBalanceLines", () => {
     expect(lines).toContainEqual({
       accountId: cash.id,
       accountType: "asset",
+      normalSide: "debit",
       side: "debit",
       amount: 30000,
     });
     expect(lines).toContainEqual({
       accountId: sales.id,
       accountType: "revenue",
+      normalSide: "credit",
       side: "credit",
       amount: 30000,
     });
@@ -427,11 +432,28 @@ describe("getLedgerAccount", () => {
       code: "401",
       name: "水道光熱費",
       accountType: "expense",
+      normalSide: "debit",
       subAccounts: [
         { id: electric.id, name: "電気" },
         { id: water.id, name: "水道" },
       ],
     });
+  });
+
+  test("評価勘定は保存された normalSide を返す（equity でも debit）", async () => {
+    const alice = await createUser("alice@example.com");
+    // 事業主貸：純資産だが通常残高は借方。
+    const drawings = await createAccount(
+      alice.id,
+      "300",
+      "事業主貸",
+      "equity",
+      "debit",
+    );
+
+    const result = await getLedgerAccount(alice.id, drawings.id);
+
+    expect(result).toMatchObject({ accountType: "equity", normalSide: "debit" });
   });
 
   test("他ユーザーの科目は取得できない（null）", async () => {

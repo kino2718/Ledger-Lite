@@ -53,7 +53,8 @@ export default async function LedgerPage({
   const lines = await getLedgerLines(userId, accountId, activeSub?.id);
   const rows = buildLedgerRows({
     lines,
-    accountType: account.accountType,
+    // 残高の向きは科目固有の通常残高（事業主貸などの評価勘定も正しく扱える）。
+    normalSide: account.normalSide,
     openingBalance: 0,
   });
   const closingBalance = rows.length > 0 ? rows[rows.length - 1].balance : 0;

@@ -37,6 +37,7 @@
 | `code` | VARCHAR | | 勘定科目コード(例: 1010) |
 | `name` | VARCHAR | NOT NULL | 科目名(例: 現金、水道光熱費) |
 | `accountType` | ENUM | NOT NULL | 科目分類(下記参照) |
+| `normalSide` | ENUM | NOT NULL | 通常残高の向き(`debit`／`credit`)。残高の積み上げ方向に使う(下記参照) |
 | `isActive` | BOOLEAN | NOT NULL | 使用中フラグ(削除せず無効化)。既定は `true`(使用中) |
 | `createdAt` | TIMESTAMP | NOT NULL | 作成日時 |
 | `updatedAt` | TIMESTAMP | NOT NULL | 更新日時 |
@@ -55,6 +56,23 @@
 > - 元入金: `owners capital`
 > - 事業主貸: `owners drawings`
 > - 事業主借: `owners contributions`
+
+#### `normalSide`（通常残高の向き）
+
+残高を積み上げる向き。借方が正なら `debit`、貸方が正なら `credit`。
+
+既定は `accountType` から決まる。
+
+| accountType | 既定の `normalSide` |
+| --- | --- |
+| `asset` / `expense` | `debit` |
+| `liability` / `equity` / `revenue` | `credit` |
+
+> ただし `normalSide` は分類とは独立に科目ごとに持つ。`事業主貸` のような
+> 評価勘定(contra)は純資産でありながら通常残高が借方のため、`equity` でも
+> `normalSide = debit` とする。将来の `貸倒引当金`(資産の控除)・
+> `減価償却累計額` なども同様に分類の既定と逆向きになる。
+> 残高の符号計算(`signedAmount`)は `accountType` ではなくこの `normalSide` を見る。
 
 #### 一意制約
 

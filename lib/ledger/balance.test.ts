@@ -21,42 +21,29 @@ describe("normalBalanceSide", () => {
 });
 
 describe("signedAmount", () => {
-  test("資産は借方がプラス、貸方がマイナス", () => {
+  test("通常残高が借方の科目は借方がプラス、貸方がマイナス", () => {
     expect(
-      signedAmount({
-        accountId: 1,
-        accountType: "asset",
-        side: "debit",
-        amount: 1000,
-      }),
+      signedAmount({ normalSide: "debit", side: "debit", amount: 1000 }),
     ).toBe(1000);
     expect(
-      signedAmount({
-        accountId: 1,
-        accountType: "asset",
-        side: "credit",
-        amount: 1000,
-      }),
+      signedAmount({ normalSide: "debit", side: "credit", amount: 1000 }),
     ).toBe(-1000);
   });
 
-  test("収益は貸方がプラス、借方がマイナス", () => {
+  test("通常残高が貸方の科目は貸方がプラス、借方がマイナス", () => {
     expect(
-      signedAmount({
-        accountId: 1,
-        accountType: "revenue",
-        side: "credit",
-        amount: 500,
-      }),
+      signedAmount({ normalSide: "credit", side: "credit", amount: 500 }),
     ).toBe(500);
     expect(
-      signedAmount({
-        accountId: 1,
-        accountType: "revenue",
-        side: "debit",
-        amount: 500,
-      }),
+      signedAmount({ normalSide: "credit", side: "debit", amount: 500 }),
     ).toBe(-500);
+  });
+
+  test("評価勘定（事業主貸など）は normalSide=debit なら借方がプラス", () => {
+    // 純資産だが通常残高は借方。借方計上が正に積み上がる。
+    expect(
+      signedAmount({ normalSide: "debit", side: "debit", amount: 10000 }),
+    ).toBe(10000);
   });
 });
 
@@ -67,8 +54,8 @@ describe("computeAccountBalances", () => {
 
   test("同一科目の借方・貸方を相殺して残高を出す", () => {
     const lines: BalanceLine[] = [
-      { accountId: 1, accountType: "asset", side: "debit", amount: 1000 },
-      { accountId: 1, accountType: "asset", side: "credit", amount: 300 },
+      { accountId: 1, accountType: "asset", normalSide: "debit", side: "debit", amount: 1000 },
+      { accountId: 1, accountType: "asset", normalSide: "debit", side: "credit", amount: 300 },
     ];
     expect(computeAccountBalances(lines)).toEqual([
       { accountId: 1, accountType: "asset", balance: 700 },
@@ -77,9 +64,9 @@ describe("computeAccountBalances", () => {
 
   test("複数科目をそれぞれ集計し、初出順を保つ", () => {
     const lines: BalanceLine[] = [
-      { accountId: 2, accountType: "revenue", side: "credit", amount: 150000 },
-      { accountId: 1, accountType: "asset", side: "debit", amount: 30000 },
-      { accountId: 2, accountType: "revenue", side: "debit", amount: 5000 },
+      { accountId: 2, accountType: "revenue", normalSide: "credit", side: "credit", amount: 150000 },
+      { accountId: 1, accountType: "asset", normalSide: "debit", side: "debit", amount: 30000 },
+      { accountId: 2, accountType: "revenue", normalSide: "credit", side: "debit", amount: 5000 },
     ];
     expect(computeAccountBalances(lines)).toEqual([
       { accountId: 2, accountType: "revenue", balance: 145000 },
@@ -89,8 +76,8 @@ describe("computeAccountBalances", () => {
 
   test("相殺して残高が 0 の科目も残す", () => {
     const lines: BalanceLine[] = [
-      { accountId: 1, accountType: "asset", side: "debit", amount: 120000 },
-      { accountId: 1, accountType: "asset", side: "credit", amount: 120000 },
+      { accountId: 1, accountType: "asset", normalSide: "debit", side: "debit", amount: 120000 },
+      { accountId: 1, accountType: "asset", normalSide: "debit", side: "credit", amount: 120000 },
     ];
     expect(computeAccountBalances(lines)).toEqual([
       { accountId: 1, accountType: "asset", balance: 0 },
@@ -101,8 +88,8 @@ describe("computeAccountBalances", () => {
 describe("computeProfitLoss", () => {
   test("収益・費用・差引を計算する", () => {
     const lines: BalanceLine[] = [
-      { accountId: 1, accountType: "revenue", side: "credit", amount: 150000 },
-      { accountId: 2, accountType: "expense", side: "debit", amount: 93000 },
+      { accountId: 1, accountType: "revenue", normalSide: "credit", side: "credit", amount: 150000 },
+      { accountId: 2, accountType: "expense", normalSide: "debit", side: "debit", amount: 93000 },
     ];
     expect(computeProfitLoss(lines)).toEqual({
       revenue: 150000,
@@ -113,9 +100,9 @@ describe("computeProfitLoss", () => {
 
   test("資産・負債・純資産は損益に含めない", () => {
     const lines: BalanceLine[] = [
-      { accountId: 1, accountType: "asset", side: "debit", amount: 1000000 },
-      { accountId: 2, accountType: "equity", side: "credit", amount: 1000000 },
-      { accountId: 3, accountType: "revenue", side: "credit", amount: 30000 },
+      { accountId: 1, accountType: "asset", normalSide: "debit", side: "debit", amount: 1000000 },
+      { accountId: 2, accountType: "equity", normalSide: "credit", side: "credit", amount: 1000000 },
+      { accountId: 3, accountType: "revenue", normalSide: "credit", side: "credit", amount: 30000 },
     ];
     expect(computeProfitLoss(lines)).toEqual({
       revenue: 30000,
@@ -126,9 +113,9 @@ describe("computeProfitLoss", () => {
 
   test("収益・費用の戻し（逆側）も符号付きで反映する", () => {
     const lines: BalanceLine[] = [
-      { accountId: 1, accountType: "revenue", side: "credit", amount: 30000 },
-      { accountId: 1, accountType: "revenue", side: "debit", amount: 5000 },
-      { accountId: 2, accountType: "expense", side: "debit", amount: 8000 },
+      { accountId: 1, accountType: "revenue", normalSide: "credit", side: "credit", amount: 30000 },
+      { accountId: 1, accountType: "revenue", normalSide: "credit", side: "debit", amount: 5000 },
+      { accountId: 2, accountType: "expense", normalSide: "debit", side: "debit", amount: 8000 },
     ];
     expect(computeProfitLoss(lines)).toEqual({
       revenue: 25000,

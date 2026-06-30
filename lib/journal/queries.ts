@@ -78,13 +78,14 @@ export async function getBalanceLines(
       accountId: true,
       side: true,
       amount: true,
-      account: { select: { accountType: true } },
+      account: { select: { accountType: true, normalSide: true } },
     },
   });
 
   return lines.map((line) => ({
     accountId: line.accountId,
     accountType: line.account.accountType,
+    normalSide: line.account.normalSide,
     side: line.side,
     amount: line.amount,
   }));
@@ -96,13 +97,14 @@ export type LedgerAccount = {
   code: string | null;
   name: string;
   accountType: AccountType;
+  normalSide: Side;
   // 補助元帳の絞り込みチップ用。過去の明細を辿れるよう無効な補助科目も含める。
   subAccounts: { id: number; name: string }[];
 };
 
 /**
  * 元帳の対象となる科目を 1 件、補助科目つきで取得する。所有者でなければ null。
- * accountType は残高の積み上げ方向（buildLedgerRows）に使う。
+ * normalSide は残高の積み上げ方向（buildLedgerRows）に使う。
  */
 export async function getLedgerAccount(
   userId: number,
@@ -116,6 +118,7 @@ export async function getLedgerAccount(
       code: true,
       name: true,
       accountType: true,
+      normalSide: true,
       subAccounts: {
         orderBy: { id: "asc" },
         select: { id: true, name: true },
