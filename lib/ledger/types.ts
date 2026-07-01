@@ -34,20 +34,26 @@ export type ProfitLoss = {
   net: number;
 };
 
-// 試算表の 1 行。debit/credit は借方・貸方それぞれの合計（総額）、
-// balance は通常残高方向の残高（signedAmount の合計）。
+// 合計残高試算表の 1 行。
+// debit/credit は借方・貸方それぞれの合計（総額）。
+// debitBalance/creditBalance は残高で、借方合計と貸方合計の差額を大きい側に置く
+// （どちらか一方が差額・他方は 0）。分類にも normalSide にも依存しない。
 export type TrialBalanceRow = {
   accountId: number;
   accountType: AccountType;
   debit: number;
   credit: number;
-  balance: number;
+  debitBalance: number;
+  creditBalance: number;
 };
 
-// 試算表全体。rows は科目ごとの合計、total* は貸借の総計。
-// 貸借平均の原理により totalDebit === totalCredit になる（集計の検算に使う）。
+// 試算表全体。rows は科目ごとの集計、total* は各列の総計。
+// 貸借平均の原理により totalDebit === totalCredit、
+// totalDebitBalance === totalCreditBalance になる（集計の検算に使う）。
 export type TrialBalance = {
   rows: TrialBalanceRow[];
   totalDebit: number;
   totalCredit: number;
+  totalDebitBalance: number;
+  totalCreditBalance: number;
 };

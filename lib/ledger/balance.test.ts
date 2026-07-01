@@ -131,15 +131,17 @@ describe("computeProfitLoss", () => {
 });
 
 describe("computeTrialBalance", () => {
-  test("空配列なら行なし・合計 0", () => {
+  test("空配列なら行なし・各列の合計 0", () => {
     expect(computeTrialBalance([])).toEqual({
       rows: [],
       totalDebit: 0,
       totalCredit: 0,
+      totalDebitBalance: 0,
+      totalCreditBalance: 0,
     });
   });
 
-  test("科目ごとに借方合計・貸方合計・残高を出し、貸借の総計が一致する", () => {
+  test("科目ごとに合計・残高を出し、貸借の総計が一致する", () => {
     // 現金売上：借方 現金 30000 / 貸方 売上高 30000。
     const lines: BalanceLine[] = [
       { accountId: 1, accountType: "asset", normalSide: "debit", side: "debit", amount: 30000 },
@@ -148,15 +150,17 @@ describe("computeTrialBalance", () => {
     const tb = computeTrialBalance(lines);
 
     expect(tb.rows).toEqual([
-      { accountId: 1, accountType: "asset", debit: 30000, credit: 0, balance: 30000 },
-      { accountId: 2, accountType: "revenue", debit: 0, credit: 30000, balance: 30000 },
+      { accountId: 1, accountType: "asset", debit: 30000, credit: 0, debitBalance: 30000, creditBalance: 0 },
+      { accountId: 2, accountType: "revenue", debit: 0, credit: 30000, debitBalance: 0, creditBalance: 30000 },
     ]);
-    // 貸借平均：借方合計＝貸方合計。
+    // 貸借平均：借方合計＝貸方合計、借方残高＝貸方残高。
     expect(tb.totalDebit).toBe(30000);
     expect(tb.totalCredit).toBe(30000);
+    expect(tb.totalDebitBalance).toBe(30000);
+    expect(tb.totalCreditBalance).toBe(30000);
   });
 
-  test("同一科目の借方・貸方をそれぞれ合計し、残高は通常残高方向で相殺する", () => {
+  test("同一科目の借方・貸方をそれぞれ合計し、差額を残高にする", () => {
     const lines: BalanceLine[] = [
       { accountId: 1, accountType: "asset", normalSide: "debit", side: "debit", amount: 1000 },
       { accountId: 1, accountType: "asset", normalSide: "debit", side: "credit", amount: 300 },
@@ -164,30 +168,35 @@ describe("computeTrialBalance", () => {
     const tb = computeTrialBalance(lines);
 
     expect(tb.rows).toEqual([
-      { accountId: 1, accountType: "asset", debit: 1000, credit: 300, balance: 700 },
+      { accountId: 1, accountType: "asset", debit: 1000, credit: 300, debitBalance: 700, creditBalance: 0 },
     ]);
     expect(tb.totalDebit).toBe(1000);
     expect(tb.totalCredit).toBe(300);
+    expect(tb.totalDebitBalance).toBe(700);
+    expect(tb.totalCreditBalance).toBe(0);
   });
 
-  test("評価勘定（事業主貸）は借方に積み、残高も正になる", () => {
-    // 借方 事業主貸 10000 / 貸方 普通預金 10000（equity だが normalSide=debit）。
+  test("評価勘定（事業主貸）は借方残高に入る（分類に依存しない）", () => {
+    // 借方 事業主貸 10000 / 貸方 普通預金 10000（equity だが借方計上）。
     const lines: BalanceLine[] = [
       { accountId: 1, accountType: "equity", normalSide: "debit", side: "debit", amount: 10000 },
       { accountId: 2, accountType: "asset", normalSide: "debit", side: "credit", amount: 10000 },
     ];
     const tb = computeTrialBalance(lines);
 
+    // 事業主貸は借方計上なので借方残高へ。
     expect(tb.rows[0]).toEqual({
       accountId: 1,
       accountType: "equity",
       debit: 10000,
       credit: 0,
-      balance: 10000,
+      debitBalance: 10000,
+      creditBalance: 0,
     });
-    // 普通預金は貸方計上なので残高はマイナス（借方科目の減少）。
-    expect(tb.rows[1].balance).toBe(-10000);
-    expect(tb.totalDebit).toBe(tb.totalCredit);
+    // 普通預金は貸方計上（お金が出た）ので貸方残高へ。
+    expect(tb.rows[1].creditBalance).toBe(10000);
+    expect(tb.rows[1].debitBalance).toBe(0);
+    expect(tb.totalDebitBalance).toBe(tb.totalCreditBalance);
   });
 
   test("残高 0 の科目も残し、初出順を保つ", () => {
@@ -205,7 +214,8 @@ describe("computeTrialBalance", () => {
       accountType: "asset",
       debit: 5000,
       credit: 5000,
-      balance: 0,
+      debitBalance: 0,
+      creditBalance: 0,
     });
   });
 });

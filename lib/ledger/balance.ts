@@ -53,10 +53,10 @@ export function computeAccountBalances(
 }
 
 /**
- * 仕訳明細から試算表を集計する。科目ごとに借方合計・貸方合計と通常残高方向の
- * 残高を出し、全体の借方合計・貸方合計も返す。1 仕訳は貸借が一致するため、
- * totalDebit と totalCredit は必ず一致する（ずれたら仕訳データの不整合＝検算）。
- * 残高 0 の科目も残し、初出順を保つ。
+ * 仕訳明細から合計残高試算表を集計する。科目ごとに借方合計・貸方合計を出し、
+ * その差額を残高として大きい側の列（借方残高／貸方残高）に置く。各列の総計も返す。
+ * 1 仕訳は貸借が一致するため、借方合計＝貸方合計・借方残高＝貸方残高となる
+ * （ずれたら仕訳データの不整合＝検算）。残高 0 の科目も残し、初出順を保つ。
  */
 export function computeTrialBalance(
   lines: readonly BalanceLine[],
@@ -72,7 +72,8 @@ export function computeTrialBalance(
         accountType: line.accountType,
         debit: 0,
         credit: 0,
-        balance: 0,
+        debitBalance: 0,
+        creditBalance: 0,
       };
       rows.set(line.accountId, row);
     }
@@ -83,10 +84,29 @@ export function computeTrialBalance(
       row.credit += line.amount;
       totalCredit += line.amount;
     }
-    // 残高は通常残高方向（評価勘定も normalSide で正しく符号がつく）。
-    row.balance += signedAmount(line);
   }
-  return { rows: [...rows.values()], totalDebit, totalCredit };
+
+  // 残高は借方合計と貸方合計の差額を、大きい側の列に置く。
+  let totalDebitBalance = 0;
+  let totalCreditBalance = 0;
+  for (const row of rows.values()) {
+    const net = row.debit - row.credit;
+    if (net > 0) {
+      row.debitBalance = net;
+      totalDebitBalance += net;
+    } else if (net < 0) {
+      row.creditBalance = -net;
+      totalCreditBalance += -net;
+    }
+  }
+
+  return {
+    rows: [...rows.values()],
+    totalDebit,
+    totalCredit,
+    totalDebitBalance,
+    totalCreditBalance,
+  };
 }
 
 /** 収益・費用・差引（純損益）を集計する。 */
