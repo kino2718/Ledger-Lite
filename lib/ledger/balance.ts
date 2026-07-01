@@ -7,6 +7,8 @@ import type {
   BalanceLine,
   ProfitLoss,
   Side,
+  TrialBalance,
+  TrialBalanceRow,
 } from "./types";
 
 // 借方を通常残高とする科目分類。
@@ -48,6 +50,43 @@ export function computeAccountBalances(
     }
   }
   return [...balances.values()];
+}
+
+/**
+ * 仕訳明細から試算表を集計する。科目ごとに借方合計・貸方合計と通常残高方向の
+ * 残高を出し、全体の借方合計・貸方合計も返す。1 仕訳は貸借が一致するため、
+ * totalDebit と totalCredit は必ず一致する（ずれたら仕訳データの不整合＝検算）。
+ * 残高 0 の科目も残し、初出順を保つ。
+ */
+export function computeTrialBalance(
+  lines: readonly BalanceLine[],
+): TrialBalance {
+  const rows = new Map<number, TrialBalanceRow>();
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const line of lines) {
+    let row = rows.get(line.accountId);
+    if (!row) {
+      row = {
+        accountId: line.accountId,
+        accountType: line.accountType,
+        debit: 0,
+        credit: 0,
+        balance: 0,
+      };
+      rows.set(line.accountId, row);
+    }
+    if (line.side === "debit") {
+      row.debit += line.amount;
+      totalDebit += line.amount;
+    } else {
+      row.credit += line.amount;
+      totalCredit += line.amount;
+    }
+    // 残高は通常残高方向（評価勘定も normalSide で正しく符号がつく）。
+    row.balance += signedAmount(line);
+  }
+  return { rows: [...rows.values()], totalDebit, totalCredit };
 }
 
 /** 収益・費用・差引（純損益）を集計する。 */
