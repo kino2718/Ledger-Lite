@@ -96,20 +96,27 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             ダッシュボード
           </h2>
-          <div className="flex items-center gap-3">
+          {/* スマホでは横幅が足りないと折り返す。各ボタン内では改行させない。 */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Link
+              href="/ledger"
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              総勘定元帳
+            </Link>
             <Link
               href="/journal"
-              className="rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
             >
               仕訳一覧
             </Link>
             <Link
               href="/journal/new"
-              className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+              className="whitespace-nowrap rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
             >
               新規仕訳 +
             </Link>
@@ -167,11 +174,16 @@ export default async function Home() {
                       key={row.accountId}
                       className="border-b border-black/5 last:border-0 dark:border-white/5"
                     >
-                      <td className="py-2 text-zinc-800 dark:text-zinc-200">
-                        {row.name}
-                        <span className="ml-2 text-xs text-zinc-400">
-                          {ACCOUNT_TYPE_LABEL[row.accountType]}
-                        </span>
+                      <td className="py-2">
+                        <Link
+                          href={`/ledger/${row.accountId}`}
+                          className="text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-zinc-50"
+                        >
+                          {row.name}
+                          <span className="ml-2 text-xs text-zinc-400">
+                            {ACCOUNT_TYPE_LABEL[row.accountType]}
+                          </span>
+                        </Link>
                       </td>
                       <td className="py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
                         {yen(row.balance)}
