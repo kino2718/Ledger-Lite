@@ -1,33 +1,20 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
-import { getAccounts, getBalanceLines } from "@/lib/journal/queries";
-import { computeAccountBalances } from "@/lib/ledger/balance";
-import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
+import { getAccountsForManagement } from "@/lib/accounts/queries";
+import { ACCOUNT_TYPE_LABEL, SIDE_LABEL } from "@/lib/ledger/types";
 
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
-
-export default async function LedgerIndexPage() {
+export default async function AccountsPage() {
   const session = await verifySession();
   const userId = Number(session.user.id);
 
-  // 全科目（コード順）と、残高表示用の集計を並列で取得する。
-  const [accounts, lines] = await Promise.all([
-    getAccounts(userId),
-    getBalanceLines(userId),
-  ]);
-
-  // 科目別残高を引けるようにマップ化する（活動のない科目は残高 0 とみなす）。
-  const balanceByAccount = new Map(
-    computeAccountBalances(lines).map((b) => [b.accountId, b.balance]),
-  );
+  const accounts = await getAccountsForManagement(userId);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
       <header className="border-b border-black/8 dark:border-white/10">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold tracking-tight text-black dark:text-zinc-50">
-            総勘定元帳
+            科目管理
           </h1>
           <Link
             href="/"
@@ -41,19 +28,19 @@ export default async function LedgerIndexPage() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            科目を選んで元帳を表示
+            勘定科目の追加・編集
           </h2>
           <Link
-            href="/ledger/trial-balance"
-            className="rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            href="/accounts/new"
+            className="whitespace-nowrap rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
           >
-            試算表
+            新規科目 +
           </Link>
         </div>
 
         {accounts.length === 0 ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
-            勘定科目がまだありません。
+            勘定科目がまだありません。「新規科目 +」から登録できます。
           </p>
         ) : (
           <ul className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
@@ -63,8 +50,11 @@ export default async function LedgerIndexPage() {
                 className="border-b border-black/5 last:border-0 dark:border-white/5"
               >
                 <Link
-                  href={`/ledger/${account.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-black/4 dark:hover:bg-white/6"
+                  href={`/accounts/${account.id}/edit`}
+                  // 無効な科目は行ごと薄くして「使っていない」ことを見せる。
+                  className={`flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-black/4 dark:hover:bg-white/6 ${
+                    account.isActive ? "" : "opacity-50"
+                  }`}
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
                     {account.code && (
@@ -75,18 +65,30 @@ export default async function LedgerIndexPage() {
                     <span className="truncate text-zinc-800 dark:text-zinc-200">
                       {account.name}
                     </span>
-                    <span className="shrink-0 text-xs text-zinc-400">
-                      {ACCOUNT_TYPE_LABEL[account.accountType]}
-                    </span>
+                    {!account.isActive && (
+                      <span className="shrink-0 rounded-full border border-black/12 px-2 py-0.5 text-xs text-zinc-500 dark:border-white/20 dark:text-zinc-400">
+                        無効
+                      </span>
+                    )}
                   </span>
-                  <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">
-                    {yen(balanceByAccount.get(account.id) ?? 0)}
+                  <span className="flex shrink-0 items-baseline gap-2 text-xs text-zinc-400">
+                    {account.subAccountCount > 0 && (
+                      <span>補助 {account.subAccountCount}</span>
+                    )}
+                    <span>
+                      {ACCOUNT_TYPE_LABEL[account.accountType]}・
+                      {SIDE_LABEL[account.normalSide]}
+                    </span>
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
         )}
+
+        <p className="mt-3 text-xs text-zinc-400">
+          「資産・借方」などの表記は、科目の分類と通常残高の向き（残高が増える側）です。
+        </p>
       </main>
     </div>
   );

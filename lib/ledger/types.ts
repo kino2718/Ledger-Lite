@@ -10,6 +10,20 @@ export type AccountType =
 
 export type Side = "debit" | "credit";
 
+// 画面表示用の日本語ラベル。複数ページで使うためここに寄せる。
+export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
+  asset: "資産",
+  liability: "負債",
+  equity: "純資産",
+  revenue: "収益",
+  expense: "費用",
+};
+
+export const SIDE_LABEL: Record<Side, string> = {
+  debit: "借方",
+  credit: "貸方",
+};
+
 // 残高集計に必要な最小限の仕訳明細。
 // accountType は損益などのグルーピング用、normalSide は符号（通常残高方向）の判定用。
 export type BalanceLine = {

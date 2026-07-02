@@ -2,20 +2,11 @@ import Link from "next/link";
 import { verifySession } from "@/lib/session";
 import { getAccounts, getBalanceLines } from "@/lib/journal/queries";
 import { computeTrialBalance } from "@/lib/ledger/balance";
-import type { AccountType } from "@/lib/ledger/types";
+import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 
 // 金額を「¥1,234」形式に整形する。0 は空欄にして罫線をすっきりさせる。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
 const yenOrBlank = (n: number) => (n === 0 ? "" : yen(n));
-
-// 科目分類の日本語ラベル。
-const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
-  asset: "資産",
-  liability: "負債",
-  equity: "純資産",
-  revenue: "収益",
-  expense: "費用",
-};
 
 export default async function TrialBalancePage() {
   const session = await verifySession();

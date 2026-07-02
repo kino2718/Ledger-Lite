@@ -3,19 +3,10 @@ import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/session";
 import { getLedgerAccount, getLedgerLines } from "@/lib/journal/queries";
 import { buildLedgerRows } from "@/lib/ledger/ledger";
-import type { AccountType } from "@/lib/ledger/types";
+import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
-
-// 科目分類の日本語ラベル。
-const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
-  asset: "資産",
-  liability: "負債",
-  equity: "純資産",
-  revenue: "収益",
-  expense: "費用",
-};
 
 // 元帳テーブルの列幅。ヘッダーと各行で同じグリッドを使って桁を揃える。
 const GRID_COLS =

@@ -7,19 +7,10 @@ import {
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
 import { computeAccountBalances, computeProfitLoss } from "@/lib/ledger/balance";
-import type { AccountType } from "@/lib/ledger/types";
+import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
-
-// 科目分類の日本語ラベル。
-const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
-  asset: "資産",
-  liability: "負債",
-  equity: "純資産",
-  revenue: "収益",
-  expense: "費用",
-};
 
 // 今月（取引日 YYYY-MM-DD 文字列）の範囲を返す。
 function currentMonthRange(now = new Date()) {
@@ -102,6 +93,12 @@ export default async function Home() {
           </h2>
           {/* スマホでは横幅が足りないと折り返す。各ボタン内では改行させない。 */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Link
+              href="/accounts"
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              科目管理
+            </Link>
             <Link
               href="/ledger"
               className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
