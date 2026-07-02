@@ -12,6 +12,10 @@ import {
   updateAccount,
   updateSubAccount,
 } from "@/lib/accounts/manage";
+import {
+  getAccountForEdit,
+  getAccountsForManagement,
+} from "@/lib/accounts/queries";
 import type { AccountInput } from "@/lib/accounts/validation";
 
 // テスト用のユーザーを用意する。
@@ -579,5 +583,132 @@ describe("deleteSubAccount", () => {
 
     expect(result.ok).toBe(false);
     expect(await prisma.subAccount.count()).toBe(1);
+  });
+});
+
+describe("getAccountsForManagement", () => {
+  test("全科目（無効含む）をコード順で、使用状況つきで返す", async () => {
+    const alice = await createUser("alice@example.com");
+    // コード順を確認するため、わざと逆順で作る。
+    const sales = await createAccount(
+      alice.id,
+      accountInput({
+        code: "400",
+        name: "売上高",
+        accountType: "revenue",
+        normalSide: "credit",
+      }),
+    );
+    const cash = await createAccount(alice.id, accountInput());
+    if (!sales.ok || !cash.ok) throw new Error("seed に失敗");
+    // 無効化した科目も一覧に出ることを確認する。
+    await updateAccount(
+      alice.id,
+      sales.id,
+      accountInput({
+        code: "400",
+        name: "売上高",
+        accountType: "revenue",
+        normalSide: "credit",
+        isActive: false,
+      }),
+    );
+    // 現金に補助科目 1 件と仕訳 1 本（明細 2 行のうち現金側 1 行）を付ける。
+    await createSubAccount(alice.id, cash.id, "レジ");
+    await seedEntryUsing(alice.id, cash.id);
+
+    const rows = await getAccountsForManagement(alice.id);
+
+    // seedEntryUsing が作る相手科目（999）も含めて 3 件、コード順。
+    expect(rows.map((r) => r.code)).toEqual(["100", "400", "999"]);
+    expect(rows[0]).toEqual({
+      id: cash.id,
+      code: "100",
+      name: "現金",
+      accountType: "asset",
+      normalSide: "debit",
+      isActive: true,
+      journalLineCount: 1,
+      subAccountCount: 1,
+    });
+    expect(rows[1]).toMatchObject({
+      name: "売上高",
+      isActive: false,
+      journalLineCount: 0,
+      subAccountCount: 0,
+    });
+  });
+
+  test("他ユーザーの科目は含まない", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    await createAccount(alice.id, accountInput());
+    await createAccount(bob.id, accountInput({ name: "ボブの現金" }));
+
+    const rows = await getAccountsForManagement(alice.id);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe("現金");
+  });
+
+  test("科目が無ければ空配列", async () => {
+    const alice = await createUser("alice@example.com");
+    expect(await getAccountsForManagement(alice.id)).toEqual([]);
+  });
+});
+
+describe("getAccountForEdit", () => {
+  test("科目を補助科目（無効含む）と使用中フラグつきで返す", async () => {
+    const alice = await createUser("alice@example.com");
+    const created = await createAccount(alice.id, accountInput());
+    if (!created.ok) throw new Error("seed に失敗");
+    const electric = await createSubAccount(alice.id, created.id, "電気");
+    const gas = await createSubAccount(alice.id, created.id, "ガス");
+    if (!electric.ok || !gas.ok) throw new Error("seed に失敗");
+    // ガスは無効化しておく（無効でも編集画面には出す）。
+    await updateSubAccount(alice.id, gas.id, { name: "ガス", isActive: false });
+    // 電気の補助科目つきで仕訳を 1 本作る → 科目・電気は使用中になる。
+    await seedEntryUsing(alice.id, created.id, electric.id);
+
+    const account = await getAccountForEdit(alice.id, created.id);
+
+    expect(account).toEqual({
+      id: created.id,
+      code: "100",
+      name: "現金",
+      accountType: "asset",
+      normalSide: "debit",
+      isActive: true,
+      inUse: true,
+      subAccounts: [
+        { id: electric.id, name: "電気", isActive: true, inUse: true },
+        { id: gas.id, name: "ガス", isActive: false, inUse: false },
+      ],
+    });
+  });
+
+  test("未使用の科目は inUse が false", async () => {
+    const alice = await createUser("alice@example.com");
+    const created = await createAccount(alice.id, accountInput());
+    if (!created.ok) throw new Error("seed に失敗");
+
+    const account = await getAccountForEdit(alice.id, created.id);
+
+    expect(account?.inUse).toBe(false);
+    expect(account?.subAccounts).toEqual([]);
+  });
+
+  test("他ユーザーの科目は null", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const created = await createAccount(alice.id, accountInput());
+    if (!created.ok) throw new Error("seed に失敗");
+
+    expect(await getAccountForEdit(bob.id, created.id)).toBeNull();
+  });
+
+  test("存在しない ID は null", async () => {
+    const alice = await createUser("alice@example.com");
+    expect(await getAccountForEdit(alice.id, 9999)).toBeNull();
   });
 });
