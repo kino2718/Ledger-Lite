@@ -4,7 +4,15 @@ import { verifySession } from "@/lib/session";
 import { getAccountForEdit } from "@/lib/accounts/queries";
 import { AccountForm } from "../../AccountForm";
 import { DeleteAccountButton } from "../../DeleteAccountButton";
-import { deleteAccountAction, updateAccountAction } from "./actions";
+import { SubAccountItem } from "../../SubAccountItem";
+import { AddSubAccountForm } from "../../AddSubAccountForm";
+import {
+  addSubAccountAction,
+  deleteAccountAction,
+  deleteSubAccountAction,
+  updateAccountAction,
+  updateSubAccountAction,
+} from "./actions";
 
 export default async function EditAccountPage({
   params,
@@ -56,6 +64,45 @@ export default async function EditAccountPage({
           inUse={account.inUse}
           submitLabel="更新"
         />
+
+        {/* 補助科目の管理。追加・改名・有効/無効・削除はこのページ内で完結する。 */}
+        <section className="mt-8 border-t border-black/8 pt-6 dark:border-white/10">
+          <h2 className="mb-3 text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            補助科目
+          </h2>
+          {account.subAccounts.length > 0 && (
+            <ul className="mb-4 overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
+              {account.subAccounts.map((sub) => (
+                <SubAccountItem
+                  key={sub.id}
+                  name={sub.name}
+                  isActive={sub.isActive}
+                  inUse={sub.inUse}
+                  // 対象 ID を結び付けたアクションを行ごとに渡す。
+                  // accountId は成功後にこのページを再描画するために使う。
+                  updateAction={updateSubAccountAction.bind(
+                    null,
+                    account.id,
+                    sub.id,
+                  )}
+                  deleteAction={deleteSubAccountAction.bind(
+                    null,
+                    account.id,
+                    sub.id,
+                  )}
+                />
+              ))}
+            </ul>
+          )}
+          <AddSubAccountForm
+            action={addSubAccountAction.bind(null, account.id)}
+          />
+          <p className="mt-3 text-xs text-zinc-400">
+            補助科目は、取引先ごとの内訳など、科目をさらに細かく分けたいときに
+            使います。仕訳で使用中の補助科目は削除できません（「有効」を外して
+            無効化すると、新しい仕訳の選択肢から消えます）。
+          </p>
+        </section>
 
         {/* 削除はフォームと独立した操作なので、区切って下部に配置する。 */}
         <div className="mt-8 flex items-center justify-between gap-4 border-t border-black/8 pt-6 dark:border-white/10">
