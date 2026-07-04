@@ -26,16 +26,87 @@ type SampleEntry = {
   lines: SampleLine[];
 };
 
-// 貸借が一致した正しい仕訳のみ。2026年6月の取引として作成。
+// 貸借が一致した正しい仕訳のみ。2025年6月の開業から2026年6月までの取引として
+// 作成（年フィルタ・前期繰越・年次繰越の動作確認に前年データを含める）。
 const SAMPLE_ENTRIES: SampleEntry[] = [
+  // ---- 2025年（前年）----
   {
-    entryDate: "2026-06-01",
+    entryDate: "2025-06-01",
     description: "開業時の元手",
     lines: [
       { code: "101", side: "debit", amount: 1_000_000 }, // 普通預金
       { code: "302", side: "credit", amount: 1_000_000 }, // 元入金
     ],
   },
+  {
+    entryDate: "2025-06-01",
+    description: "6月分 事務所家賃",
+    lines: [
+      { code: "502", side: "debit", amount: 80_000 }, // 地代家賃
+      { code: "101", side: "credit", amount: 80_000 }, // 普通預金
+    ],
+  },
+  {
+    entryDate: "2025-07-05",
+    description: "売上計上（掛）",
+    lines: [
+      { code: "102", side: "debit", amount: 200_000 }, // 売掛金
+      { code: "400", side: "credit", amount: 200_000 }, // 売上高
+    ],
+  },
+  {
+    entryDate: "2025-07-20",
+    description: "売掛金の回収",
+    lines: [
+      { code: "101", side: "debit", amount: 200_000 }, // 普通預金
+      { code: "102", side: "credit", amount: 200_000 }, // 売掛金
+    ],
+  },
+  {
+    entryDate: "2025-08-10",
+    description: "インターネット利用料",
+    lines: [
+      { code: "500", sub: "インターネット仕事のみ", side: "debit", amount: 5_000 }, // 通信費
+      { code: "101", side: "credit", amount: 5_000 }, // 普通預金
+    ],
+  },
+  {
+    entryDate: "2025-09-12",
+    description: "電気料金",
+    lines: [
+      { code: "501", sub: "電気", side: "debit", amount: 8_000 }, // 水道光熱費
+      { code: "101", side: "credit", amount: 8_000 }, // 普通預金
+    ],
+  },
+  {
+    entryDate: "2025-10-01",
+    description: "生活費の引き出し",
+    lines: [
+      { code: "300", side: "debit", amount: 150_000 }, // 事業主貸
+      { code: "101", side: "credit", amount: 150_000 }, // 普通預金
+    ],
+  },
+  {
+    entryDate: "2025-11-15",
+    description: "郵送料を家計の現金で立て替え",
+    lines: [
+      { code: "500", side: "debit", amount: 3_000 }, // 通信費
+      { code: "301", side: "credit", amount: 3_000 }, // 事業主借
+    ],
+  },
+  {
+    entryDate: "2025-12-20",
+    description: "現金売上",
+    lines: [
+      { code: "100", side: "debit", amount: 50_000 }, // 現金
+      { code: "400", side: "credit", amount: 50_000 }, // 売上高
+    ],
+  },
+  // ---- 2026年（当年）----
+  // 2025年末の残高（2026年の前期繰越の期待値）:
+  //   普通預金 957,000 / 現金 50,000 / 売掛金 0
+  //   事業主貸 150,000 / 事業主借 3,000 / 元入金 1,000,000
+  //   （2025年の損益: 売上 250,000 − 費用 96,000 ＝ +154,000）
   {
     entryDate: "2026-06-01",
     description: "6月分 事務所家賃",
