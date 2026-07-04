@@ -7,6 +7,7 @@ vi.mock("server-only", () => ({}));
 import { prisma } from "@/lib/prisma";
 import {
   getBalanceLines,
+  getFirstEntryDate,
   getJournalEntries,
   getJournalEntry,
   getLedgerAccount,
@@ -279,6 +280,78 @@ describe("getJournalEntries", () => {
     ]);
 
     expect(await getJournalEntries(alice.id)).toEqual([]);
+  });
+
+  test("period で取引日の範囲に絞る（年フィルタ）", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2025-12-31", "前年の取引", [
+      { accountId: cash.id, side: "debit", amount: 1000 },
+      { accountId: sales.id, side: "credit", amount: 1000 },
+    ]);
+    await createEntry(alice.id, "2026-01-01", "当年最初の取引", [
+      { accountId: cash.id, side: "debit", amount: 2000 },
+      { accountId: sales.id, side: "credit", amount: 2000 },
+    ]);
+    await createEntry(alice.id, "2026-12-31", "当年最後の取引", [
+      { accountId: cash.id, side: "debit", amount: 3000 },
+      { accountId: sales.id, side: "credit", amount: 3000 },
+    ]);
+    await createEntry(alice.id, "2027-01-01", "翌年の取引", [
+      { accountId: cash.id, side: "debit", amount: 4000 },
+      { accountId: sales.id, side: "credit", amount: 4000 },
+    ]);
+
+    const entries = await getJournalEntries(alice.id, {
+      from: "2026-01-01",
+      to: "2026-12-31",
+    });
+
+    // 境界（1/1・12/31）は含み、前年・翌年は含まない。新しい順のまま。
+    expect(entries.map((e) => e.description)).toEqual([
+      "当年最後の取引",
+      "当年最初の取引",
+    ]);
+  });
+});
+
+// --- getFirstEntryDate（年セレクタの範囲） -------------------------------------
+
+describe("getFirstEntryDate", () => {
+  test("一番古い仕訳の取引日を返す", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2026-06-18", "新しい取引", [
+      { accountId: cash.id, side: "debit", amount: 1000 },
+      { accountId: sales.id, side: "credit", amount: 1000 },
+    ]);
+    await createEntry(alice.id, "2024-03-15", "一番古い取引", [
+      { accountId: cash.id, side: "debit", amount: 2000 },
+      { accountId: sales.id, side: "credit", amount: 2000 },
+    ]);
+
+    expect(await getFirstEntryDate(alice.id)).toBe("2024-03-15");
+  });
+
+  test("仕訳が無ければ null を返す", async () => {
+    const alice = await createUser("alice@example.com");
+
+    expect(await getFirstEntryDate(alice.id)).toBeNull();
+  });
+
+  test("他ユーザーの仕訳は見ない", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const bobCash = await createAccount(bob.id, "100", "現金", "asset");
+    const bobSales = await createAccount(bob.id, "400", "売上高", "revenue");
+    await createEntry(bob.id, "2020-01-01", "bob の古い取引", [
+      { accountId: bobCash.id, side: "debit", amount: 1000 },
+      { accountId: bobSales.id, side: "credit", amount: 1000 },
+    ]);
+
+    expect(await getFirstEntryDate(alice.id)).toBeNull();
   });
 });
 

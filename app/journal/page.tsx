@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
-import { getJournalEntries } from "@/lib/journal/queries";
+import { getFirstEntryDate, getJournalEntries } from "@/lib/journal/queries";
 import type { JournalEntryLineView } from "@/lib/journal/queries";
+import {
+  currentYear,
+  resolveYearSelection,
+  yearOf,
+  yearOptions,
+  yearRange,
+} from "@/lib/ledger/period";
+import { YearFilter } from "@/app/components/YearFilter";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -43,9 +51,36 @@ function LineColumn({
   );
 }
 
-export default async function JournalListPage() {
+export default async function JournalListPage({
+  searchParams,
+}: {
+  // この版ではクエリは Promise で渡るため await して取り出す。
+  searchParams: Promise<{ year?: string }>;
+}) {
   const session = await verifySession();
-  const entries = await getJournalEntries(Number(session.user.id));
+  const userId = Number(session.user.id);
+
+  // ?year= を解釈する（未指定・不正値は今年、"all" は全期間）。
+  const { year: yearParam } = await searchParams;
+  const thisYear = currentYear();
+  const selection = resolveYearSelection(yearParam, thisYear);
+
+  const entries = await getJournalEntries(
+    userId,
+    selection === "all" ? undefined : yearRange(selection),
+  );
+
+  // 年セレクタの選択肢は「一番古い仕訳の年〜今年」。
+  // URL 直指定でその範囲外の年が選ばれていたら、選択肢にも足して迷子にしない。
+  const firstEntryDate = await getFirstEntryDate(userId);
+  const years = yearOptions(
+    firstEntryDate !== null ? yearOf(firstEntryDate) : null,
+    thisYear,
+  );
+  if (selection !== "all" && !years.includes(selection)) {
+    years.push(selection);
+    years.sort((a, b) => b - a);
+  }
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -64,9 +99,15 @@ export default async function JournalListPage() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+        {/* 年セレクタ。表示する年を切り替える（既定は今年）。 */}
+        <div className="mb-4">
+          <YearFilter basePath="/journal" years={years} selection={selection} />
+        </div>
+
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            全 {entries.length} 件
+            {selection === "all" ? "全期間" : `${selection}年`}・
+            {entries.length} 件
           </h2>
           <Link
             href="/journal/new"
@@ -78,7 +119,10 @@ export default async function JournalListPage() {
 
         {entries.length === 0 ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
-            仕訳はまだありません。「新規仕訳 +」から登録できます。
+            {/* 仕訳が 1 件も無いときと、選んだ年に無いだけのときで文言を分ける。 */}
+            {firstEntryDate !== null && selection !== "all"
+              ? `${selection}年の仕訳はありません。`
+              : "仕訳はまだありません。「新規仕訳 +」から登録できます。"}
           </p>
         ) : (
           <ul className="flex flex-col gap-3">

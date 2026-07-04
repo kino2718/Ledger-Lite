@@ -5,9 +5,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AccountType, BalanceLine, Side } from "@/lib/ledger/types";
 import type { LedgerSourceLine } from "@/lib/ledger/ledger";
+import type { DateRange } from "@/lib/ledger/period";
 
-// 取引日（YYYY-MM-DD 文字列）の範囲指定。辞書順＝日付順なので文字列比較で足りる。
-export type DateRange = { from?: string; to?: string };
+// 期間指定の型は年度ユーティリティ（lib/ledger/period.ts）に定義がある。
+// これまで通りこのモジュールからも使えるよう再公開しておく。
+export type { DateRange } from "@/lib/ledger/period";
 
 // 残高表示などで科目名を引くための最小情報。
 export type AccountSummary = {
@@ -250,14 +252,22 @@ function debitTotal(lines: { side: Side; amount: number }[]): number {
 }
 
 /**
- * ユーザーの全仕訳を新しい順に、各明細（科目名・補助科目名つき）も含めて取得する。
+ * ユーザーの仕訳を新しい順に、各明細（科目名・補助科目名つき）も含めて取得する。
  * 一覧で借方・貸方の科目まで確認できる（科目の取り違えを見つけやすくする）。
+ * period を渡すと取引日でその範囲に絞る（仕訳一覧の年フィルタに使う）。
  */
 export async function getJournalEntries(
   userId: number,
+  period?: DateRange,
 ): Promise<JournalEntryRow[]> {
   const entries = await prisma.journalEntry.findMany({
-    where: { userId },
+    where: {
+      userId,
+      entryDate: {
+        ...(period?.from ? { gte: period.from } : {}),
+        ...(period?.to ? { lte: period.to } : {}),
+      },
+    },
     // 取引日の降順。同日内は登録の新しい順（id 降順）で安定させる。
     orderBy: [{ entryDate: "desc" }, { id: "desc" }],
     select: {
@@ -287,6 +297,20 @@ export async function getJournalEntries(
       subAccountName: line.subAccount?.name ?? null,
     })),
   }));
+}
+
+/**
+ * 一番古い仕訳の取引日を返す（仕訳が無ければ null）。
+ * 年セレクタに並べる年の範囲（最初の年〜今年）を決めるのに使う。
+ */
+export async function getFirstEntryDate(
+  userId: number,
+): Promise<string | null> {
+  const result = await prisma.journalEntry.aggregate({
+    where: { userId },
+    _min: { entryDate: true },
+  });
+  return result._min.entryDate;
 }
 
 /** 最近の仕訳を新しい順に取得する（既定で 5 件・明細なしの軽いサマリ）。 */
