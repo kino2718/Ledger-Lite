@@ -7,25 +7,34 @@ export function YearFilter({
   basePath,
   years,
   selection,
+  extraParams,
 }: {
   // クエリを付けるページのパス（例: "/journal"）。
   basePath: string;
   // 選択肢に並べる年（新しい順を想定）。
   years: number[];
   selection: YearSelection;
+  // 年以外に維持したいクエリ（例: 補助元帳の { sub: "3" }）。
+  extraParams?: Record<string, string>;
 }) {
+  const hrefFor = (value: string) => {
+    const params = new URLSearchParams(extraParams);
+    params.set("year", value);
+    return `${basePath}?${params.toString()}`;
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {years.map((year) => (
         <Chip
           key={year}
-          href={`${basePath}?year=${year}`}
+          href={hrefFor(String(year))}
           active={selection === year}
           label={`${year}年`}
         />
       ))}
       <Chip
-        href={`${basePath}?year=all`}
+        href={hrefFor("all")}
         active={selection === "all"}
         label="全期間"
       />

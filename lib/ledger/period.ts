@@ -43,15 +43,21 @@ export function resolveYearSelection(
 /**
  * 年セレクタに並べる年の一覧を新しい順で作る（最初の仕訳の年〜今年）。
  * firstYear が null（仕訳なし）や今年より後のときは今年だけを返す。
+ * URL 直指定でこの範囲外の年が選ばれていたら、選択肢にも足して迷子にしない。
  */
 export function yearOptions(
   firstYear: number | null,
   thisYear: number,
+  selection?: YearSelection,
 ): number[] {
   const start = firstYear === null ? thisYear : Math.min(firstYear, thisYear);
   const years: number[] = [];
   for (let year = thisYear; year >= start; year--) {
     years.push(year);
+  }
+  if (typeof selection === "number" && !years.includes(selection)) {
+    years.push(selection);
+    years.sort((a, b) => b - a);
   }
   return years;
 }

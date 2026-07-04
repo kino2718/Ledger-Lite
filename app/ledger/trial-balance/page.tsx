@@ -1,22 +1,55 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
-import { getAccounts, getBalanceLines } from "@/lib/journal/queries";
+import {
+  getAccounts,
+  getBalanceLines,
+  getFirstEntryDate,
+} from "@/lib/journal/queries";
 import { computeTrialBalance } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
+import {
+  currentYear,
+  resolveYearSelection,
+  yearOf,
+  yearOptions,
+  yearRange,
+} from "@/lib/ledger/period";
+import { YearFilter } from "@/app/components/YearFilter";
 
 // 金額を「¥1,234」形式に整形する。0 は空欄にして罫線をすっきりさせる。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
 const yenOrBlank = (n: number) => (n === 0 ? "" : yen(n));
 
-export default async function TrialBalancePage() {
+export default async function TrialBalancePage({
+  searchParams,
+}: {
+  // この版ではクエリは Promise で渡るため await して取り出す。
+  searchParams: Promise<{ year?: string }>;
+}) {
   const session = await verifySession();
   const userId = Number(session.user.id);
 
+  // ?year= を解釈する（未指定・不正値は今年、"all" は全期間）。
+  const { year: yearParam } = await searchParams;
+  const thisYear = currentYear();
+  const selection = resolveYearSelection(yearParam, thisYear);
+
   // 全科目（科目名・コード用）と、集計対象の明細を並列で取得する。
-  const [accounts, lines] = await Promise.all([
+  const [accounts, lines, firstEntryDate] = await Promise.all([
     getAccounts(userId),
-    getBalanceLines(userId),
+    getBalanceLines(
+      userId,
+      selection === "all" ? undefined : yearRange(selection),
+    ),
+    getFirstEntryDate(userId),
   ]);
+
+  // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。
+  const years = yearOptions(
+    firstEntryDate !== null ? yearOf(firstEntryDate) : null,
+    thisYear,
+    selection,
+  );
 
   const tb = computeTrialBalance(lines);
 
@@ -38,6 +71,9 @@ export default async function TrialBalancePage() {
     tb.totalDebit === tb.totalCredit &&
     tb.totalDebitBalance === tb.totalCreditBalance;
 
+  // 科目リンクは選択中の年を引き継いで元帳を開く。
+  const yearParamValue = selection === "all" ? "all" : String(selection);
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
       <header className="border-b border-black/8 dark:border-white/10">
@@ -46,7 +82,7 @@ export default async function TrialBalancePage() {
             試算表
           </h1>
           <Link
-            href="/ledger"
+            href={`/ledger?year=${yearParamValue}`}
             className="text-sm text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
           >
             ← 総勘定元帳
@@ -55,13 +91,25 @@ export default async function TrialBalancePage() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        {/* 年セレクタ。集計対象の年を切り替える（既定は今年）。 */}
+        <div className="mb-4">
+          <YearFilter
+            basePath="/ledger/trial-balance"
+            years={years}
+            selection={selection}
+          />
+        </div>
+
         <p className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          合計残高試算表（全期間）
+          合計残高試算表（
+          {selection === "all" ? "全期間" : `${selection}年`}）
         </p>
 
         {rows.length === 0 ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
-            集計できる仕訳がまだありません。
+            {firstEntryDate !== null && selection !== "all"
+              ? `${selection}年の仕訳はありません。`
+              : "集計できる仕訳がまだありません。"}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
@@ -91,7 +139,7 @@ export default async function TrialBalancePage() {
                     </td>
                     <td className="px-4 py-2">
                       <Link
-                        href={`/ledger/${row.accountId}`}
+                        href={`/ledger/${row.accountId}?year=${yearParamValue}`}
                         className="inline-flex items-baseline gap-2 text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-zinc-50"
                       >
                         {row.code && (

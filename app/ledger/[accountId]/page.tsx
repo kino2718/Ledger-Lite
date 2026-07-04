@@ -1,9 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/session";
-import { getLedgerAccount, getLedgerLines } from "@/lib/journal/queries";
+import {
+  getFirstEntryDate,
+  getLedgerAccount,
+  getLedgerLines,
+  getOpeningBalance,
+} from "@/lib/journal/queries";
 import { buildLedgerRows } from "@/lib/ledger/ledger";
+import { carriesBalanceForward } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
+import {
+  currentYear,
+  resolveYearSelection,
+  yearOf,
+  yearOptions,
+  yearRange,
+} from "@/lib/ledger/period";
+import { YearFilter } from "@/app/components/YearFilter";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -18,7 +32,7 @@ export default async function LedgerPage({
 }: {
   // この版では動的セグメント・クエリは Promise で渡るため await して取り出す。
   params: Promise<{ accountId: string }>;
-  searchParams: Promise<{ sub?: string }>;
+  searchParams: Promise<{ sub?: string; year?: string }>;
 }) {
   const { accountId: accountIdParam } = await params;
   const accountId = Number(accountIdParam);
@@ -33,25 +47,67 @@ export default async function LedgerPage({
   if (!account) notFound();
 
   // ?sub= は対象科目に属する補助科目のときだけ有効にする（不正値は無視＝全件）。
-  const { sub } = await searchParams;
+  const { sub, year: yearParam } = await searchParams;
   const subId = sub !== undefined ? Number(sub) : undefined;
   const activeSub =
     subId !== undefined
       ? account.subAccounts.find((s) => s.id === subId)
       : undefined;
 
+  // ?year= を解釈する（未指定・不正値は今年、"all" は全期間）。
+  const thisYear = currentYear();
+  const selection = resolveYearSelection(yearParam, thisYear);
+
+  // 年で絞ったときは、年初より前の残高を「前期繰越」として先頭に置く。
+  // ただし収益・費用は毎年ゼロから始まるため前期繰越を持たない。
+  const carriesForward = carriesBalanceForward(account.accountType);
+  const openingBalance =
+    selection === "all" || !carriesForward
+      ? 0
+      : await getOpeningBalance({
+          userId,
+          accountId: account.id,
+          normalSide: account.normalSide,
+          before: `${selection}-01-01`,
+          subAccountId: activeSub?.id,
+        });
+
   // 明細を取得し、純粋関数で残高を積み上げて表示用の行に変換する。
-  const lines = await getLedgerLines(userId, accountId, activeSub?.id);
+  const lines = await getLedgerLines(
+    userId,
+    accountId,
+    activeSub?.id,
+    selection === "all" ? undefined : yearRange(selection),
+  );
   const rows = buildLedgerRows({
     lines,
     // 残高の向きは科目固有の通常残高（事業主貸などの評価勘定も正しく扱える）。
     normalSide: account.normalSide,
-    openingBalance: 0,
+    openingBalance,
   });
-  const closingBalance = rows.length > 0 ? rows[rows.length - 1].balance : 0;
+  const closingBalance =
+    rows.length > 0 ? rows[rows.length - 1].balance : openingBalance;
 
-  // 補助科目チップのリンク先（全件＝クエリなし、各補助科目＝?sub=）。
-  const allHref = `/ledger/${account.id}`;
+  // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。
+  const firstEntryDate = await getFirstEntryDate(userId);
+  const years = yearOptions(
+    firstEntryDate !== null ? yearOf(firstEntryDate) : null,
+    thisYear,
+    selection,
+  );
+
+  // 前期繰越行は年で絞ったとき、繰り越す科目にだけ出す。
+  // 行も繰越も無い年は空表示に倒す。
+  const showOpeningRow = selection !== "all" && carriesForward;
+  const hasContent = rows.length > 0 || (showOpeningRow && openingBalance !== 0);
+
+  // 補助科目チップのリンク先。選択中の年を維持したまま補助科目を切り替える。
+  const yearParamValue = selection === "all" ? "all" : String(selection);
+  const subHref = (subAccountId?: number) => {
+    const params = new URLSearchParams({ year: yearParamValue });
+    if (subAccountId !== undefined) params.set("sub", String(subAccountId));
+    return `/ledger/${account.id}?${params.toString()}`;
+  };
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -64,7 +120,7 @@ export default async function LedgerPage({
             )}
           </h1>
           <Link
-            href="/ledger"
+            href={`/ledger?year=${yearParamValue}`}
             className="text-sm text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
           >
             ← 科目一覧
@@ -89,14 +145,24 @@ export default async function LedgerPage({
           </p>
         </div>
 
+        {/* 年セレクタ。補助科目の選択は維持したまま年を切り替える。 */}
+        <div className="mb-4">
+          <YearFilter
+            basePath={`/ledger/${account.id}`}
+            years={years}
+            selection={selection}
+            extraParams={activeSub ? { sub: String(activeSub.id) } : undefined}
+          />
+        </div>
+
         {/* 補助科目の絞り込みチップ（補助科目を持つ科目のみ） */}
         {account.subAccounts.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Chip href={allHref} active={!activeSub} label="すべて" />
+            <Chip href={subHref()} active={!activeSub} label="すべて" />
             {account.subAccounts.map((s) => (
               <Chip
                 key={s.id}
-                href={`/ledger/${account.id}?sub=${s.id}`}
+                href={subHref(s.id)}
                 active={activeSub?.id === s.id}
                 label={s.name}
               />
@@ -104,9 +170,11 @@ export default async function LedgerPage({
           </div>
         )}
 
-        {rows.length === 0 ? (
+        {!hasContent ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
-            この科目の仕訳はまだありません。
+            {selection === "all"
+              ? "この科目の仕訳はまだありません。"
+              : `${selection}年の仕訳はありません。`}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
@@ -122,6 +190,25 @@ export default async function LedgerPage({
                 <span className="text-right">貸方</span>
                 <span className="text-right">残高</span>
               </div>
+              {/* 前期繰越行（年で絞ったときのみ）。仕訳ではないのでリンクにしない。 */}
+              {showOpeningRow && (
+                <div
+                  className={`grid ${GRID_COLS} gap-2 border-b border-black/5 px-4 py-2 text-sm last:border-0 dark:border-white/5`}
+                >
+                  <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
+                    {selection}-01-01
+                  </span>
+                  <span className="text-zinc-800 dark:text-zinc-200">
+                    前期繰越
+                  </span>
+                  <span className="text-zinc-600 dark:text-zinc-400">—</span>
+                  <span />
+                  <span />
+                  <span className="text-right font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {yen(openingBalance)}
+                  </span>
+                </div>
+              )}
               {/* 各行は元の仕訳の編集ページへのリンク */}
               {rows.map((row, i) => (
                 <Link

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { AccountType, BalanceLine, Side } from "@/lib/ledger/types";
 import type { LedgerSourceLine } from "@/lib/ledger/ledger";
 import type { DateRange } from "@/lib/ledger/period";
+import { signedAmount } from "@/lib/ledger/balance";
 
 // 期間指定の型は年度ユーティリティ（lib/ledger/period.ts）に定義がある。
 // これまで通りこのモジュールからも使えるよう再公開しておく。
@@ -221,6 +222,41 @@ export async function getLedgerLines(
       accountName: sibling.account.name,
     })),
   }));
+}
+
+/**
+ * ある科目（必要なら補助科目）の、指定日より前（その日を含まない）の残高を
+ * 通常残高方向で返す。元帳を年で絞ったときの「前期繰越」行に使う。
+ * 明細を 1 行ずつ取らず、借方・貸方それぞれの合計だけを DB に集計させる。
+ */
+export async function getOpeningBalance(params: {
+  userId: number;
+  accountId: number;
+  normalSide: Side;
+  // この日付より前の明細を合計する（YYYY-MM-DD。例: 年初の "2026-01-01"）。
+  before: string;
+  subAccountId?: number;
+}): Promise<number> {
+  const { userId, accountId, normalSide, before, subAccountId } = params;
+  const sums = await prisma.journalLine.groupBy({
+    by: ["side"],
+    where: {
+      accountId,
+      ...(subAccountId !== undefined ? { subAccountId } : {}),
+      entry: { userId, entryDate: { lt: before } },
+    },
+    _sum: { amount: true },
+  });
+
+  let balance = 0;
+  for (const sum of sums) {
+    balance += signedAmount({
+      normalSide,
+      side: sum.side,
+      amount: sum._sum.amount ?? 0,
+    });
+  }
+  return balance;
 }
 
 // 一覧・最近の仕訳に共通する見出し情報。total は借方合計（＝取引金額）。

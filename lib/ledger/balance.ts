@@ -23,6 +23,14 @@ export function normalBalanceSide(type: AccountType): Side {
   return DEBIT_NORMAL.has(type) ? "debit" : "credit";
 }
 
+/**
+ * 残高を翌年に繰り越す科目かどうか。貸借対照表の科目（資産・負債・純資産）は
+ * 繰り越すが、収益・費用はその年の発生額を表すため「前期繰越」の概念を持たない。
+ */
+export function carriesBalanceForward(type: AccountType): boolean {
+  return type === "asset" || type === "liability" || type === "equity";
+}
+
 /** 1 行を通常残高方向で符号付き金額にする（通常側=正、逆側=負）。 */
 export function signedAmount(line: {
   side: Side;

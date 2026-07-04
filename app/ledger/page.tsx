@@ -1,26 +1,80 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
-import { getAccounts, getBalanceLines } from "@/lib/journal/queries";
-import { computeAccountBalances } from "@/lib/ledger/balance";
+import {
+  getAccounts,
+  getBalanceLines,
+  getFirstEntryDate,
+} from "@/lib/journal/queries";
+import {
+  carriesBalanceForward,
+  computeAccountBalances,
+} from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
+import {
+  currentYear,
+  resolveYearSelection,
+  yearOf,
+  yearOptions,
+  yearRange,
+} from "@/lib/ledger/period";
+import { YearFilter } from "@/app/components/YearFilter";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
 
-export default async function LedgerIndexPage() {
+export default async function LedgerIndexPage({
+  searchParams,
+}: {
+  // この版ではクエリは Promise で渡るため await して取り出す。
+  searchParams: Promise<{ year?: string }>;
+}) {
   const session = await verifySession();
   const userId = Number(session.user.id);
 
-  // 全科目（コード順）と、残高表示用の集計を並列で取得する。
-  const [accounts, lines] = await Promise.all([
+  // ?year= を解釈する（未指定・不正値は今年、"all" は全期間）。
+  const { year: yearParam } = await searchParams;
+  const thisYear = currentYear();
+  const selection = resolveYearSelection(yearParam, thisYear);
+  const period = selection === "all" ? undefined : yearRange(selection);
+
+  // 残高の集計範囲は科目の種類で分ける。
+  // - 資産・負債・純資産: 選択年の年末までの累計（＝年末時点の残高）
+  // - 収益・費用: 選択年の発生額（毎年ゼロから数え直す）
+  // 全期間選択時はどちらも全明細の累計なので、集計は 1 回で済ませる。
+  const [accounts, stockLines, flowLines, firstEntryDate] = await Promise.all([
     getAccounts(userId),
-    getBalanceLines(userId),
+    getBalanceLines(userId, period ? { to: period.to } : undefined),
+    period ? getBalanceLines(userId, period) : null,
+    getFirstEntryDate(userId),
   ]);
 
   // 科目別残高を引けるようにマップ化する（活動のない科目は残高 0 とみなす）。
-  const balanceByAccount = new Map(
-    computeAccountBalances(lines).map((b) => [b.accountId, b.balance]),
+  const stockBalances = new Map(
+    computeAccountBalances(stockLines).map((b) => [b.accountId, b.balance]),
   );
+  const flowBalances =
+    flowLines === null
+      ? stockBalances
+      : new Map(
+          computeAccountBalances(flowLines).map((b) => [b.accountId, b.balance]),
+        );
+
+  // 一覧に出す金額。その科目の元帳を同じ年で開いたときの最終残高と一致する。
+  const balanceFor = (account: (typeof accounts)[number]) =>
+    (carriesBalanceForward(account.accountType)
+      ? stockBalances
+      : flowBalances
+    ).get(account.id) ?? 0;
+
+  // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。
+  const years = yearOptions(
+    firstEntryDate !== null ? yearOf(firstEntryDate) : null,
+    thisYear,
+    selection,
+  );
+
+  // 科目・試算表へのリンクは選択中の年を引き継ぐ。
+  const yearParamValue = selection === "all" ? "all" : String(selection);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -39,12 +93,17 @@ export default async function LedgerIndexPage() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+        {/* 年セレクタ。残高の集計対象年を切り替える（既定は今年）。 */}
+        <div className="mb-4">
+          <YearFilter basePath="/ledger" years={years} selection={selection} />
+        </div>
+
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             科目を選んで元帳を表示
           </h2>
           <Link
-            href="/ledger/trial-balance"
+            href={`/ledger/trial-balance?year=${yearParamValue}`}
             className="rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
           >
             試算表
@@ -63,7 +122,7 @@ export default async function LedgerIndexPage() {
                 className="border-b border-black/5 last:border-0 dark:border-white/5"
               >
                 <Link
-                  href={`/ledger/${account.id}`}
+                  href={`/ledger/${account.id}?year=${yearParamValue}`}
                   className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-black/4 dark:hover:bg-white/6"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
@@ -80,7 +139,7 @@ export default async function LedgerIndexPage() {
                     </span>
                   </span>
                   <span className="shrink-0 tabular-nums text-zinc-900 dark:text-zinc-100">
-                    {yen(balanceByAccount.get(account.id) ?? 0)}
+                    {yen(balanceFor(account))}
                   </span>
                 </Link>
               </li>

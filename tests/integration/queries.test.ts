@@ -12,6 +12,7 @@ import {
   getJournalEntry,
   getLedgerAccount,
   getLedgerLines,
+  getOpeningBalance,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
 import { normalBalanceSide } from "@/lib/ledger/balance";
@@ -352,6 +353,124 @@ describe("getFirstEntryDate", () => {
     ]);
 
     expect(await getFirstEntryDate(alice.id)).toBeNull();
+  });
+});
+
+// --- getOpeningBalance（前期繰越） ---------------------------------------------
+
+describe("getOpeningBalance", () => {
+  test("指定日より前の明細を通常残高方向で合計する（当日は含まない）", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    // 前年: 収入 30,000 − 支出 8,000 ＝ 現金 22,000。
+    await createEntry(alice.id, "2025-06-10", "前年の売上", [
+      { accountId: cash.id, side: "debit", amount: 30000 },
+      { accountId: sales.id, side: "credit", amount: 30000 },
+    ]);
+    await createEntry(alice.id, "2025-12-31", "前年の支払", [
+      { accountId: sales.id, side: "debit", amount: 8000 },
+      { accountId: cash.id, side: "credit", amount: 8000 },
+    ]);
+    // 当日（年初）以降の明細は含まれない。
+    await createEntry(alice.id, "2026-01-01", "当年の売上", [
+      { accountId: cash.id, side: "debit", amount: 5000 },
+      { accountId: sales.id, side: "credit", amount: 5000 },
+    ]);
+
+    const balance = await getOpeningBalance({
+      userId: alice.id,
+      accountId: cash.id,
+      normalSide: "debit",
+      before: "2026-01-01",
+    });
+
+    expect(balance).toBe(22000);
+  });
+
+  test("貸方科目は貸方が正になる", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const loan = await createAccount(alice.id, "200", "借入金", "liability");
+    await createEntry(alice.id, "2025-04-01", "借入", [
+      { accountId: cash.id, side: "debit", amount: 100000 },
+      { accountId: loan.id, side: "credit", amount: 100000 },
+    ]);
+    await createEntry(alice.id, "2025-10-01", "一部返済", [
+      { accountId: loan.id, side: "debit", amount: 30000 },
+      { accountId: cash.id, side: "credit", amount: 30000 },
+    ]);
+
+    const balance = await getOpeningBalance({
+      userId: alice.id,
+      accountId: loan.id,
+      normalSide: "credit",
+      before: "2026-01-01",
+    });
+
+    expect(balance).toBe(70000);
+  });
+
+  test("subAccountId を渡すとその補助科目の明細だけを合計する", async () => {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    const shopA = await prisma.subAccount.create({
+      data: { accountId: sales.id, name: "A店" },
+    });
+    await createEntry(alice.id, "2025-06-10", "A店の売上", [
+      { accountId: cash.id, side: "debit", amount: 30000 },
+      {
+        accountId: sales.id,
+        subAccountId: shopA.id,
+        side: "credit",
+        amount: 30000,
+      },
+    ]);
+    await createEntry(alice.id, "2025-06-11", "補助科目なしの売上", [
+      { accountId: cash.id, side: "debit", amount: 10000 },
+      { accountId: sales.id, side: "credit", amount: 10000 },
+    ]);
+
+    const balance = await getOpeningBalance({
+      userId: alice.id,
+      accountId: sales.id,
+      normalSide: "credit",
+      before: "2026-01-01",
+      subAccountId: shopA.id,
+    });
+
+    expect(balance).toBe(30000);
+  });
+
+  test("明細が無ければ 0、他ユーザーの明細は見ない", async () => {
+    const alice = await createUser("alice@example.com");
+    const bob = await createUser("bob@example.com");
+    const aliceCash = await createAccount(alice.id, "100", "現金", "asset");
+    const bobCash = await createAccount(bob.id, "100", "現金", "asset");
+    const bobSales = await createAccount(bob.id, "400", "売上高", "revenue");
+    await createEntry(bob.id, "2025-06-10", "bob の売上", [
+      { accountId: bobCash.id, side: "debit", amount: 99999 },
+      { accountId: bobSales.id, side: "credit", amount: 99999 },
+    ]);
+
+    expect(
+      await getOpeningBalance({
+        userId: alice.id,
+        accountId: aliceCash.id,
+        normalSide: "debit",
+        before: "2026-01-01",
+      }),
+    ).toBe(0);
+    // bob の科目 ID を指定しても、userId が alice なら 0 のまま。
+    expect(
+      await getOpeningBalance({
+        userId: alice.id,
+        accountId: bobCash.id,
+        normalSide: "debit",
+        before: "2026-01-01",
+      }),
+    ).toBe(0);
   });
 });
 

@@ -70,17 +70,13 @@ export default async function JournalListPage({
     selection === "all" ? undefined : yearRange(selection),
   );
 
-  // 年セレクタの選択肢は「一番古い仕訳の年〜今年」。
-  // URL 直指定でその範囲外の年が選ばれていたら、選択肢にも足して迷子にしない。
+  // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。
   const firstEntryDate = await getFirstEntryDate(userId);
   const years = yearOptions(
     firstEntryDate !== null ? yearOf(firstEntryDate) : null,
     thisYear,
+    selection,
   );
-  if (selection !== "all" && !years.includes(selection)) {
-    years.push(selection);
-    years.sort((a, b) => b - a);
-  }
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">

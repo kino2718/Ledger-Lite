@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  carriesBalanceForward,
   computeAccountBalances,
   computeProfitLoss,
   computeTrialBalance,
@@ -7,6 +8,19 @@ import {
   signedAmount,
 } from "./balance";
 import type { BalanceLine } from "./types";
+
+describe("carriesBalanceForward", () => {
+  test("貸借対照表の科目（資産・負債・純資産）は残高を繰り越す", () => {
+    expect(carriesBalanceForward("asset")).toBe(true);
+    expect(carriesBalanceForward("liability")).toBe(true);
+    expect(carriesBalanceForward("equity")).toBe(true);
+  });
+
+  test("収益・費用は繰り越さない（前期繰越を持たない）", () => {
+    expect(carriesBalanceForward("revenue")).toBe(false);
+    expect(carriesBalanceForward("expense")).toBe(false);
+  });
+});
 
 describe("normalBalanceSide", () => {
   test("資産・費用は借方が通常残高", () => {

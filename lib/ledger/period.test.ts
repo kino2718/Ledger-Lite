@@ -79,4 +79,14 @@ describe("yearOptions", () => {
   test("最初の仕訳が未来の年でも今年だけ（範囲が壊れない）", () => {
     expect(yearOptions(2027, 2026)).toEqual([2026]);
   });
+
+  test("選択中の年が範囲外なら選択肢に足して新しい順を保つ", () => {
+    expect(yearOptions(2025, 2026, 2020)).toEqual([2026, 2025, 2020]);
+    expect(yearOptions(2025, 2026, 2030)).toEqual([2030, 2026, 2025]);
+  });
+
+  test("選択中の年が範囲内・全期間なら一覧はそのまま", () => {
+    expect(yearOptions(2025, 2026, 2025)).toEqual([2026, 2025]);
+    expect(yearOptions(2025, 2026, "all")).toEqual([2026, 2025]);
+  });
 });
