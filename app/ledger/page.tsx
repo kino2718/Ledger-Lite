@@ -98,16 +98,25 @@ export default async function LedgerIndexPage({
           <YearFilter basePath="/ledger" years={years} selection={selection} />
         </div>
 
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             科目を選んで元帳を表示
           </h2>
-          <Link
-            href={`/ledger/trial-balance?year=${yearParamValue}`}
-            className="rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
-          >
-            試算表
-          </Link>
+          {/* 決算レポートへの導線。選択中の年を引き継ぐ。 */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link
+              href={`/ledger/trial-balance?year=${yearParamValue}`}
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              試算表
+            </Link>
+            <Link
+              href={`/ledger/profit-loss?year=${yearParamValue}`}
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              損益計算書
+            </Link>
+          </div>
         </div>
 
         {accounts.length === 0 ? (
