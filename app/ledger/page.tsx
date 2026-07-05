@@ -116,6 +116,12 @@ export default async function LedgerIndexPage({
             >
               損益計算書
             </Link>
+            <Link
+              href={`/ledger/balance-sheet?year=${yearParamValue}`}
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              貸借対照表
+            </Link>
           </div>
         </div>
 
