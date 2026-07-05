@@ -6,8 +6,13 @@ import {
   getBalanceLines,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
-import { computeAccountBalances, computeProfitLoss } from "@/lib/ledger/balance";
+import {
+  carriesBalanceForward,
+  computeAccountBalances,
+  computeProfitLoss,
+} from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
+import { currentYear, yearRange } from "@/lib/ledger/period";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -31,17 +36,33 @@ export default async function Home() {
   const userId = Number(session.user.id);
   const month = currentMonthRange();
 
-  // 必要なデータをまとめて取得（互いに独立なので並列で）。
-  const [allLines, monthLines, accounts, recent] = await Promise.all([
-    getBalanceLines(userId),
-    getBalanceLines(userId, { from: month.from, to: month.to }),
-    getAccounts(userId),
-    getRecentJournalEntries(userId),
-  ]);
+  // 科目別残高は今年に固定する（年を切り替えたいときは総勘定元帳へ）。
+  // 集計範囲は /ledger と同じルール:
+  // - 資産・負債・純資産: 今年の年末までの累計（＝現時点の残高）
+  // - 収益・費用: 今年の発生額（毎年ゼロから数え直す）
+  const thisYear = currentYear();
+  const period = yearRange(thisYear);
 
-  // 今月の損益と、全期間の科目別残高を集計する。
+  // 必要なデータをまとめて取得（互いに独立なので並列で）。
+  const [stockLines, flowLines, monthLines, accounts, recent] =
+    await Promise.all([
+      getBalanceLines(userId, { to: period.to }),
+      getBalanceLines(userId, period),
+      getBalanceLines(userId, { from: month.from, to: month.to }),
+      getAccounts(userId),
+      getRecentJournalEntries(userId),
+    ]);
+
+  // 今月の損益と、科目別残高を集計する。
   const pl = computeProfitLoss(monthLines);
-  const balances = computeAccountBalances(allLines);
+  const balances = [
+    ...computeAccountBalances(stockLines).filter((b) =>
+      carriesBalanceForward(b.accountType),
+    ),
+    ...computeAccountBalances(flowLines).filter(
+      (b) => !carriesBalanceForward(b.accountType),
+    ),
+  ];
 
   // 残高に科目名・コードを付け、コード順に並べる。
   const accountById = new Map(accounts.map((a) => [a.id, a]));
@@ -157,7 +178,7 @@ export default async function Home() {
           {/* 科目別残高 */}
           <section className="rounded-2xl border border-black/8 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-950">
             <h3 className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              科目別残高
+              科目別残高（{thisYear}年）
             </h3>
             {trialBalance.length === 0 ? (
               <p className="py-6 text-center text-sm text-zinc-400">
