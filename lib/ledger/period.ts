@@ -41,6 +41,17 @@ export function resolveYearSelection(
 }
 
 /**
+ * 年セレクタの「全期間」の表示名を作る。
+ * 締め済みの年があると累計は繰越仕訳の日付（集計開始日）からになり、
+ * もう「全期間」ではないため「2025年〜」のような表記にする。
+ * 集計開始日が無い（締めが無い）うちはそのまま「全期間」。
+ */
+export function allPeriodLabel(aggregationStart: string | undefined): string {
+  if (aggregationStart === undefined) return "全期間";
+  return `${yearOf(aggregationStart)}年〜`;
+}
+
+/**
  * 年セレクタに並べる年の一覧を新しい順で作る（最初の仕訳の年〜今年）。
  * firstYear が null（仕訳なし）や今年より後のときは今年だけを返す。
  * URL 直指定でこの範囲外の年が選ばれていたら、選択肢にも足して迷子にしない。

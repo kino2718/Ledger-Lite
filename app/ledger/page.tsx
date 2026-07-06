@@ -11,6 +11,7 @@ import {
 } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import {
+  allPeriodLabel,
   currentYear,
   resolveYearSelection,
   yearOf,
@@ -39,10 +40,11 @@ export default async function LedgerIndexPage({
   const period = selection === "all" ? undefined : yearRange(selection);
 
   // 締め済みの年があれば、累計は繰越仕訳の日付から集計する（二重計上防止）。
-  const aggStart = await getAggregationStart(
-    userId,
-    selection === "all" ? undefined : selection,
-  );
+  // allStart は最新の締めに基づく開始日で、「全期間」チップの表記に使う。
+  const [aggStart, allStart] = await Promise.all([
+    getAggregationStart(userId, selection === "all" ? undefined : selection),
+    getAggregationStart(userId),
+  ]);
 
   // 残高の集計範囲は科目の種類で分ける。
   // - 資産・負債・純資産: 選択年の年末までの累計（＝年末時点の残高）
@@ -106,7 +108,12 @@ export default async function LedgerIndexPage({
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {/* 年セレクタ。残高の集計対象年を切り替える（既定は今年）。 */}
         <div className="mb-4">
-          <YearFilter basePath="/ledger" years={years} selection={selection} />
+          <YearFilter
+            basePath="/ledger"
+            years={years}
+            selection={selection}
+            allLabel={allPeriodLabel(allStart)}
+          />
         </div>
 
         <div className="mb-4 flex items-center justify-between gap-3">

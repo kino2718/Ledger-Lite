@@ -11,6 +11,7 @@ import { buildLedgerRows } from "@/lib/ledger/ledger";
 import { carriesBalanceForward } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import {
+  allPeriodLabel,
   currentYear,
   resolveYearSelection,
   yearOf,
@@ -61,10 +62,11 @@ export default async function LedgerPage({
 
   // 締め済みの年があれば、集計は繰越仕訳の日付から始める（二重計上防止）。
   // 繰越仕訳自体は普通の仕訳として明細行に表示される。
-  const aggStart = await getAggregationStart(
-    userId,
-    selection === "all" ? undefined : selection,
-  );
+  // allStart は最新の締めに基づく開始日で、「全期間」チップの表記に使う。
+  const [aggStart, allStart] = await Promise.all([
+    getAggregationStart(userId, selection === "all" ? undefined : selection),
+    getAggregationStart(userId),
+  ]);
 
   // 年で絞ったときは、年初より前の残高を「前期繰越」として先頭に置く。
   // ただし収益・費用は毎年ゼロから始まるため前期繰越を持たない。
@@ -166,6 +168,7 @@ export default async function LedgerPage({
             basePath={`/ledger/${account.id}`}
             years={years}
             selection={selection}
+            allLabel={allPeriodLabel(allStart)}
             extraParams={activeSub ? { sub: String(activeSub.id) } : undefined}
           />
         </div>

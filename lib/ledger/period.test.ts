@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  allPeriodLabel,
   currentYear,
   parseYearParam,
   resolveYearSelection,
@@ -60,6 +61,17 @@ describe("resolveYearSelection", () => {
   test("未指定・不正値は今年に倒す", () => {
     expect(resolveYearSelection(undefined, 2026)).toBe(2026);
     expect(resolveYearSelection("abc", 2026)).toBe(2026);
+  });
+});
+
+describe("allPeriodLabel", () => {
+  test("集計開始日が無ければ「全期間」", () => {
+    expect(allPeriodLabel(undefined)).toBe("全期間");
+  });
+
+  test("集計開始日があれば「{開始年}年〜」", () => {
+    expect(allPeriodLabel("2025-01-01")).toBe("2025年〜");
+    expect(allPeriodLabel("2027-01-01")).toBe("2027年〜");
   });
 });
 

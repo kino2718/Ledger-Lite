@@ -12,6 +12,7 @@ import {
 } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import {
+  allPeriodLabel,
   currentYear,
   resolveYearSelection,
   yearOf,
@@ -39,10 +40,11 @@ export default async function BalanceSheetPage({
   const selection = resolveYearSelection(yearParam, thisYear);
 
   // 締め済みの年があれば、累計は繰越仕訳の日付から集計する（二重計上防止）。
-  const aggStart = await getAggregationStart(
-    userId,
-    selection === "all" ? undefined : selection,
-  );
+  // allStart は最新の締めに基づく開始日で、「全期間」チップの表記に使う。
+  const [aggStart, allStart] = await Promise.all([
+    getAggregationStart(userId, selection === "all" ? undefined : selection),
+    getAggregationStart(userId),
+  ]);
 
   // 貸借対照表は「時点」の表なので、選んだ年の年末までの累計を集計する。
   // 全期間を選んだときは現在時点の残高になる。
@@ -133,6 +135,7 @@ export default async function BalanceSheetPage({
             basePath="/ledger/balance-sheet"
             years={years}
             selection={selection}
+            allLabel={allPeriodLabel(allStart)}
           />
         </div>
 

@@ -7,6 +7,7 @@ export function YearFilter({
   basePath,
   years,
   selection,
+  allLabel = "全期間",
   extraParams,
 }: {
   // クエリを付けるページのパス（例: "/journal"）。
@@ -14,6 +15,9 @@ export function YearFilter({
   // 選択肢に並べる年（新しい順を想定）。
   years: number[];
   selection: YearSelection;
+  // 「全期間」チップの表示名。締め済みの年がある集計ページでは
+  // allPeriodLabel で作った「2025年〜」のような表記を渡す。
+  allLabel?: string;
   // 年以外に維持したいクエリ（例: 補助元帳の { sub: "3" }）。
   extraParams?: Record<string, string>;
 }) {
@@ -36,7 +40,7 @@ export function YearFilter({
       <Chip
         href={hrefFor("all")}
         active={selection === "all"}
-        label="全期間"
+        label={allLabel}
       />
     </div>
   );

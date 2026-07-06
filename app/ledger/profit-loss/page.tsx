@@ -11,6 +11,7 @@ import {
 } from "@/lib/ledger/balance";
 import type { AccountBalance } from "@/lib/ledger/types";
 import {
+  allPeriodLabel,
   currentYear,
   resolveYearSelection,
   yearOf,
@@ -40,8 +41,8 @@ export default async function ProfitLossPage({
   // 全期間のときも、締め済みの年があれば繰越仕訳の日付から集計する
   // （他ページの全期間や、科目リンク先の元帳と金額を一致させるため）。
   // 年で絞ったときはその年の明細のみ（繰越仕訳に収益・費用は入らない）。
-  const aggStart =
-    selection === "all" ? await getAggregationStart(userId) : undefined;
+  // この開始日は「全期間」チップと見出しの表記にも使う。
+  const aggStart = await getAggregationStart(userId);
 
   // 全科目（科目名・コード用）と、集計対象の明細を並列で取得する。
   const [accounts, lines, firstEntryDate] = await Promise.all([
@@ -113,11 +114,13 @@ export default async function ProfitLossPage({
             basePath="/ledger/profit-loss"
             years={years}
             selection={selection}
+            allLabel={allPeriodLabel(aggStart)}
           />
         </div>
 
         <p className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          損益計算書（{selection === "all" ? "全期間" : `${selection}年`}）
+          損益計算書（
+          {selection === "all" ? allPeriodLabel(aggStart) : `${selection}年`}）
         </p>
 
         {!hasContent ? (

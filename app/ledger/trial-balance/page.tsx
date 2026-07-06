@@ -8,6 +8,7 @@ import {
 import { computeTrialBalance } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import {
+  allPeriodLabel,
   currentYear,
   resolveYearSelection,
   yearOf,
@@ -37,8 +38,8 @@ export default async function TrialBalancePage({
 
   // 全期間のときも、締め済みの年があれば繰越仕訳の日付から集計する（二重計上防止）。
   // 年で絞ったときはその年の明細のみ（前年を締めていれば繰越仕訳が期首として入る）。
-  const aggStart =
-    selection === "all" ? await getAggregationStart(userId) : undefined;
+  // この開始日は「全期間」チップと見出しの表記にも使う。
+  const aggStart = await getAggregationStart(userId);
 
   // 全科目（科目名・コード用）と、集計対象の明細を並列で取得する。
   const [accounts, lines, firstEntryDate] = await Promise.all([
@@ -107,12 +108,13 @@ export default async function TrialBalancePage({
             basePath="/ledger/trial-balance"
             years={years}
             selection={selection}
+            allLabel={allPeriodLabel(aggStart)}
           />
         </div>
 
         <p className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
           合計残高試算表（
-          {selection === "all" ? "全期間" : `${selection}年`}）
+          {selection === "all" ? allPeriodLabel(aggStart) : `${selection}年`}）
         </p>
 
         {rows.length === 0 ? (
