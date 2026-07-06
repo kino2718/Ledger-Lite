@@ -13,6 +13,7 @@ import {
 } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import { currentYear, yearRange } from "@/lib/ledger/period";
+import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -43,10 +44,16 @@ export default async function Home() {
   const thisYear = currentYear();
   const period = yearRange(thisYear);
 
+  // 締め済みの年があれば、累計は繰越仕訳の日付から集計する（二重計上防止）。
+  const aggStart = await getAggregationStart(userId, thisYear);
+
   // 必要なデータをまとめて取得（互いに独立なので並列で）。
   const [stockLines, flowLines, monthLines, accounts, recent] =
     await Promise.all([
-      getBalanceLines(userId, { to: period.to }),
+      getBalanceLines(userId, {
+        ...(aggStart !== undefined ? { from: aggStart } : {}),
+        to: period.to,
+      }),
       getBalanceLines(userId, period),
       getBalanceLines(userId, { from: month.from, to: month.to }),
       getAccounts(userId),

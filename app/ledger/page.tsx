@@ -18,6 +18,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -37,13 +38,23 @@ export default async function LedgerIndexPage({
   const selection = resolveYearSelection(yearParam, thisYear);
   const period = selection === "all" ? undefined : yearRange(selection);
 
+  // 締め済みの年があれば、累計は繰越仕訳の日付から集計する（二重計上防止）。
+  const aggStart = await getAggregationStart(
+    userId,
+    selection === "all" ? undefined : selection,
+  );
+
   // 残高の集計範囲は科目の種類で分ける。
   // - 資産・負債・純資産: 選択年の年末までの累計（＝年末時点の残高）
   // - 収益・費用: 選択年の発生額（毎年ゼロから数え直す）
-  // 全期間選択時はどちらも全明細の累計なので、集計は 1 回で済ませる。
+  // 全期間選択時はどちらも同じ範囲の累計なので、集計は 1 回で済ませる。
+  const stockRange = {
+    ...(aggStart !== undefined ? { from: aggStart } : {}),
+    ...(period ? { to: period.to } : {}),
+  };
   const [accounts, stockLines, flowLines, firstEntryDate] = await Promise.all([
     getAccounts(userId),
-    getBalanceLines(userId, period ? { to: period.to } : undefined),
+    getBalanceLines(userId, stockRange),
     period ? getBalanceLines(userId, period) : null,
     getFirstEntryDate(userId),
   ]);

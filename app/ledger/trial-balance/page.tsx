@@ -15,6 +15,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。0 は空欄にして罫線をすっきりさせる。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -34,12 +35,21 @@ export default async function TrialBalancePage({
   const thisYear = currentYear();
   const selection = resolveYearSelection(yearParam, thisYear);
 
+  // 全期間のときも、締め済みの年があれば繰越仕訳の日付から集計する（二重計上防止）。
+  // 年で絞ったときはその年の明細のみ（前年を締めていれば繰越仕訳が期首として入る）。
+  const aggStart =
+    selection === "all" ? await getAggregationStart(userId) : undefined;
+
   // 全科目（科目名・コード用）と、集計対象の明細を並列で取得する。
   const [accounts, lines, firstEntryDate] = await Promise.all([
     getAccounts(userId),
     getBalanceLines(
       userId,
-      selection === "all" ? undefined : yearRange(selection),
+      selection === "all"
+        ? aggStart !== undefined
+          ? { from: aggStart }
+          : undefined
+        : yearRange(selection),
     ),
     getFirstEntryDate(userId),
   ]);

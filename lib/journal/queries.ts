@@ -235,15 +235,23 @@ export async function getOpeningBalance(params: {
   normalSide: Side;
   // この日付より前の明細を合計する（YYYY-MM-DD。例: 年初の "2026-01-01"）。
   before: string;
+  // この日付以降だけを合計する（年度締めの集計開始日。無ければ最初から）。
+  from?: string;
   subAccountId?: number;
 }): Promise<number> {
-  const { userId, accountId, normalSide, before, subAccountId } = params;
+  const { userId, accountId, normalSide, before, from, subAccountId } = params;
   const sums = await prisma.journalLine.groupBy({
     by: ["side"],
     where: {
       accountId,
       ...(subAccountId !== undefined ? { subAccountId } : {}),
-      entry: { userId, entryDate: { lt: before } },
+      entry: {
+        userId,
+        entryDate: {
+          ...(from !== undefined ? { gte: from } : {}),
+          lt: before,
+        },
+      },
     },
     _sum: { amount: true },
   });

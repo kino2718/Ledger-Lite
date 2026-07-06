@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 // 各テストの前にテーブルを空にして、テスト間の独立性を保つ。
 // onDelete: Restrict があるため、外部キーの依存順（子→親）に削除する。
 beforeEach(async () => {
+  // YearClosing は繰越仕訳を Restrict で参照しているため仕訳より先に消す。
+  await prisma.yearClosing.deleteMany();
   await prisma.journalLine.deleteMany();
   await prisma.journalEntry.deleteMany();
   await prisma.subAccount.deleteMany();

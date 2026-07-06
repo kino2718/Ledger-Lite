@@ -22,6 +22,7 @@ model User {
 
   accounts       Account[]
   journalEntries JournalEntry[]
+  yearClosings   YearClosing[]
 }
 
 // 勘定科目の分類。損益計算書・貸借対照表への集計単位。
@@ -86,9 +87,28 @@ model JournalEntry {
   user  User          @relation(fields: [userId], references: [id], onDelete: Restrict)
   // ヘッダー削除で明細も連動削除する。
   lines JournalLine[]
+  // この仕訳が年度締めの繰越仕訳なら、その締めレコード。
+  yearClosing YearClosing?
 
   // ユーザー単位＋期間での仕訳検索・一覧用。
   @@index([userId, entryDate])
+}
+
+// 年度の締め（決算確定）。1 レコード＝締めた 1 年。
+// 繰越仕訳の特定・保護はここからの参照で行う（仕訳側にフラグは持たない）。
+model YearClosing {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  year           Int // 締めた年（例: 2025）。会計期間は暦年固定。
+  openingEntryId Int      @unique // 締めで生成した翌年 1/1 付の繰越仕訳
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // 繰越仕訳は締め解除でのみ消す。仕訳側からの単独削除は Restrict で防ぐ。
+  openingEntry JournalEntry @relation(fields: [openingEntryId], references: [id], onDelete: Restrict)
+
+  // 同じ年を二重に締めることはできない。
+  @@unique([userId, year])
 }
 
 // 借方/貸方の区分。

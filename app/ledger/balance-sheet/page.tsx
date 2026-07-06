@@ -19,6 +19,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -37,14 +38,20 @@ export default async function BalanceSheetPage({
   const thisYear = currentYear();
   const selection = resolveYearSelection(yearParam, thisYear);
 
+  // 締め済みの年があれば、累計は繰越仕訳の日付から集計する（二重計上防止）。
+  const aggStart = await getAggregationStart(
+    userId,
+    selection === "all" ? undefined : selection,
+  );
+
   // 貸借対照表は「時点」の表なので、選んだ年の年末までの累計を集計する。
-  // 全期間を選んだときは全明細＝現在時点の残高になる。
+  // 全期間を選んだときは現在時点の残高になる。
   const [accounts, lines, firstEntryDate] = await Promise.all([
     getAccounts(userId),
-    getBalanceLines(
-      userId,
-      selection === "all" ? undefined : { to: yearRange(selection).to },
-    ),
+    getBalanceLines(userId, {
+      ...(aggStart !== undefined ? { from: aggStart } : {}),
+      ...(selection === "all" ? {} : { to: yearRange(selection).to }),
+    }),
     getFirstEntryDate(userId),
   ]);
 
@@ -83,8 +90,16 @@ export default async function BalanceSheetPage({
   const creditTotal = creditRows.reduce((sum, r) => sum + r.balance, 0);
 
   // 純資産の部に入る損益。集計期間全体の収益 − 費用。
-  // 年次繰越（締め）を実装するまでは、前年までの損益も含んだ累計になる。
+  // 前年を締めていれば集計開始＝年初なので、ちょうど当期分（当期損益）になる。
+  // 帳簿の最初の年も、それ以前に仕訳が無いので同じく当期分になる。
+  // それ以外の年は、集計開始からの累計損益が入る。
   const pl = computeProfitLoss(lines);
+  const plLabel =
+    selection !== "all" &&
+    (aggStart === `${selection}-01-01` ||
+      (firstEntryDate !== null && yearOf(firstEntryDate) === selection))
+      ? "当期損益"
+      : "損益";
 
   // 貸借の検算：資産側の合計＝負債・純資産側の合計＋損益。
   const rightTotal = creditTotal + pl.net;
@@ -172,7 +187,7 @@ export default async function BalanceSheetPage({
                   {/* 集計期間の損益。貸借対照表では純資産の一部になる。 */}
                   <tr className="border-b border-black/5 dark:border-white/5">
                     <td className="px-4 py-2 text-zinc-800 dark:text-zinc-200">
-                      損益
+                      {plLabel}
                       <Link
                         href={`/ledger/profit-loss?year=${yearParamValue}`}
                         className="ml-2 text-xs text-zinc-400 transition-colors hover:text-black dark:hover:text-zinc-50"

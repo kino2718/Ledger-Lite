@@ -135,6 +135,14 @@ export async function deleteJournalEntry(
 ): Promise<DeleteJournalEntryResult> {
   // where に userId を含めることで所有スコープを担保する。
   // deleteMany は該当 0 件でも例外にならず、消えた件数を返す。
-  const result = await prisma.journalEntry.deleteMany({ where: { id, userId } });
-  return result.count > 0 ? { ok: true } : { ok: false };
+  try {
+    const result = await prisma.journalEntry.deleteMany({
+      where: { id, userId },
+    });
+    return result.count > 0 ? { ok: true } : { ok: false };
+  } catch {
+    // 年度締めの繰越仕訳は YearClosing から参照されており削除できない
+    // （締め解除で消す）。外部キー制約違反はエラー表示に倒す。
+    return { ok: false };
+  }
 }

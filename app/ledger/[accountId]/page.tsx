@@ -18,6 +18,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -58,8 +59,16 @@ export default async function LedgerPage({
   const thisYear = currentYear();
   const selection = resolveYearSelection(yearParam, thisYear);
 
+  // 締め済みの年があれば、集計は繰越仕訳の日付から始める（二重計上防止）。
+  // 繰越仕訳自体は普通の仕訳として明細行に表示される。
+  const aggStart = await getAggregationStart(
+    userId,
+    selection === "all" ? undefined : selection,
+  );
+
   // 年で絞ったときは、年初より前の残高を「前期繰越」として先頭に置く。
   // ただし収益・費用は毎年ゼロから始まるため前期繰越を持たない。
+  // 前年を締めた年は集計開始＝年初なので 0 になり、代わりに繰越仕訳の行が出る。
   const carriesForward = carriesBalanceForward(account.accountType);
   const openingBalance =
     selection === "all" || !carriesForward
@@ -69,6 +78,7 @@ export default async function LedgerPage({
           accountId: account.id,
           normalSide: account.normalSide,
           before: `${selection}-01-01`,
+          from: aggStart,
           subAccountId: activeSub?.id,
         });
 
@@ -77,7 +87,11 @@ export default async function LedgerPage({
     userId,
     accountId,
     activeSub?.id,
-    selection === "all" ? undefined : yearRange(selection),
+    selection === "all"
+      ? aggStart !== undefined
+        ? { from: aggStart }
+        : undefined
+      : yearRange(selection),
   );
   const rows = buildLedgerRows({
     lines,
@@ -96,10 +110,11 @@ export default async function LedgerPage({
     selection,
   );
 
-  // 前期繰越行は年で絞ったとき、繰り越す科目にだけ出す。
-  // 行も繰越も無い年は空表示に倒す。
-  const showOpeningRow = selection !== "all" && carriesForward;
-  const hasContent = rows.length > 0 || (showOpeningRow && openingBalance !== 0);
+  // 前期繰越行は年で絞ったとき、繰り越す科目に残高がある場合だけ出す
+  // （前年を締めた年は繰越仕訳の行が出るので、この行は不要になる）。
+  const showOpeningRow =
+    selection !== "all" && carriesForward && openingBalance !== 0;
+  const hasContent = rows.length > 0 || showOpeningRow;
 
   // 補助科目チップのリンク先。選択中の年を維持したまま補助科目を切り替える。
   const yearParamValue = selection === "all" ? "all" : String(selection);
