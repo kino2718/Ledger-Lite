@@ -49,6 +49,19 @@ export async function getAggregationStart(
 }
 
 /**
+ * 補助科目の名前一覧を取得する（繰越プレビューの表示用）。
+ * 無効化済みの補助科目にも残高が残っていることがあるため、有効・無効を問わない。
+ */
+export async function getSubAccountNames(
+  userId: number,
+): Promise<{ id: number; name: string }[]> {
+  return prisma.subAccount.findMany({
+    where: { account: { userId } },
+    select: { id: true, name: true },
+  });
+}
+
+/**
  * 繰越計算用の仕訳明細を取得する。残高集計用（getBalanceLines）とほぼ同じだが、
  * 繰越仕訳で補助科目の内訳を保つため subAccountId も含める。
  */

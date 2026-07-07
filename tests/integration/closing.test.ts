@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { prisma } from "@/lib/prisma";
-import { closeYear, reopenYear } from "@/lib/closing/manage";
+import { closeYear, previewCloseYear, reopenYear } from "@/lib/closing/manage";
 import { getAggregationStart, getYearClosings } from "@/lib/closing/queries";
 import { deleteJournalEntry } from "@/lib/journal/create";
 import { getBalanceLines } from "@/lib/journal/queries";
@@ -407,6 +407,109 @@ describe("closeYear", () => {
     await closeYear(alice.id, 2025);
     expect(await getYearClosings(bob.id)).toHaveLength(0);
     expect(await getAggregationStart(bob.id)).toBeUndefined();
+  });
+});
+
+// --- previewCloseYear -----------------------------------------------------------
+
+describe("previewCloseYear", () => {
+  test("実際の締めと同じ内容を返し、何も書き込まない", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    await seed2025(alice.id, a);
+    const entryCountBefore = await prisma.journalEntry.count();
+
+    const previewed = await previewCloseYear(alice.id, 2025);
+    expect(previewed).toMatchObject({ ok: true });
+    if (!previewed.ok) return;
+
+    // 損益と明細（借方 普通預金 1,004,000 ／ 貸方 元入金 1,004,000）。
+    expect(previewed.preview.netIncome).toBe(151000);
+    expect(previewed.preview.lines).toEqual([
+      {
+        accountId: a.bank.id,
+        subAccountId: null,
+        side: "debit",
+        amount: 1004000,
+      },
+      {
+        accountId: a.capital.id,
+        subAccountId: null,
+        side: "credit",
+        amount: 1004000,
+      },
+    ]);
+
+    // プレビューは読み取りだけ。仕訳も YearClosing も増えない。
+    expect(await prisma.journalEntry.count()).toBe(entryCountBefore);
+    expect(await getYearClosings(alice.id)).toHaveLength(0);
+
+    // その後の締めでプレビューと同じ明細の繰越仕訳が作られる。
+    const result = await closeYear(alice.id, 2025);
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    const entry = await prisma.journalEntry.findUnique({
+      where: { id: result.openingEntryId },
+      include: { lines: { orderBy: { lineNo: "asc" } } },
+    });
+    expect(
+      entry?.lines.map((line) => ({
+        accountId: line.accountId,
+        subAccountId: line.subAccountId,
+        side: line.side,
+        amount: line.amount,
+      })),
+    ).toEqual(previewed.preview.lines);
+  });
+
+  test("明細は借方・貸方それぞれ科目コード順に並ぶ", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    // コードの小さい科目（現金 100）をあとから使い、集計の出現順とコード順をずらす。
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    await createEntry(alice.id, "2025-06-01", "開業", [
+      { accountId: a.bank.id, side: "debit", amount: 100000 },
+      { accountId: a.capital.id, side: "credit", amount: 100000 },
+    ]);
+    await createEntry(alice.id, "2025-07-01", "現金売上", [
+      { accountId: cash.id, side: "debit", amount: 30000 },
+      { accountId: a.sales.id, side: "credit", amount: 30000 },
+    ]);
+
+    const previewed = await previewCloseYear(alice.id, 2025);
+    expect(previewed).toMatchObject({ ok: true });
+    if (!previewed.ok) return;
+
+    // 借方は現金（100）→ 普通預金（101）の順。新元入金 ＝ 100,000 ＋ 30,000。
+    expect(previewed.preview.lines).toEqual([
+      { accountId: cash.id, subAccountId: null, side: "debit", amount: 30000 },
+      {
+        accountId: a.bank.id,
+        subAccountId: null,
+        side: "debit",
+        amount: 100000,
+      },
+      {
+        accountId: a.capital.id,
+        subAccountId: null,
+        side: "credit",
+        amount: 130000,
+      },
+    ]);
+  });
+
+  test("「元入金」の科目が無いとエラーになる（締めと同じ検証）", async () => {
+    const alice = await createUser("alice@example.com");
+    const bank = await createAccount(alice.id, "101", "普通預金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2025-03-01", "売上", [
+      { accountId: bank.id, side: "debit", amount: 50000 },
+      { accountId: sales.id, side: "credit", amount: 50000 },
+    ]);
+
+    const previewed = await previewCloseYear(alice.id, 2025);
+    expect(previewed.ok).toBe(false);
+    if (!previewed.ok) expect(previewed.errors[0]).toContain("元入金");
   });
 });
 

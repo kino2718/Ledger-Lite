@@ -140,6 +140,12 @@ export default async function Home() {
               仕訳一覧
             </Link>
             <Link
+              href="/closing"
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              決算
+            </Link>
+            <Link
               href="/journal/new"
               className="whitespace-nowrap rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
             >
