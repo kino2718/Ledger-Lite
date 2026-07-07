@@ -286,6 +286,8 @@ export type JournalEntryLineView = {
 // 一覧の 1 仕訳（見出し＋明細）。
 export type JournalEntryRow = JournalSummary & {
   lines: JournalEntryLineView[];
+  // 年度締めで作られた繰越仕訳なら true（一覧でバッジを付ける）。
+  isOpening: boolean;
 };
 
 // 明細から取引金額（借方合計）を求める。
@@ -318,6 +320,8 @@ export async function getJournalEntries(
       id: true,
       entryDate: true,
       description: true,
+      // 繰越仕訳かどうかの判定用（YearClosing から参照されていれば繰越仕訳）。
+      yearClosing: { select: { id: true } },
       lines: {
         orderBy: { lineNo: "asc" },
         select: {
@@ -334,6 +338,7 @@ export async function getJournalEntries(
     entryDate: entry.entryDate,
     description: entry.description,
     total: debitTotal(entry.lines),
+    isOpening: entry.yearClosing !== null,
     lines: entry.lines.map((line) => ({
       side: line.side,
       amount: line.amount,
@@ -386,6 +391,8 @@ export type JournalEntryDetail = {
   id: number;
   entryDate: string;
   description: string | null;
+  // 年度締めで作られた繰越仕訳なら true（編集ページで編集を止める）。
+  isOpening: boolean;
   lines: {
     accountId: number;
     subAccountId: number | null;
@@ -399,13 +406,14 @@ export async function getJournalEntry(
   userId: number,
   id: number,
 ): Promise<JournalEntryDetail | null> {
-  return prisma.journalEntry.findFirst({
+  const entry = await prisma.journalEntry.findFirst({
     // id だけでなく userId も条件にして所有スコープを担保する。
     where: { id, userId },
     select: {
       id: true,
       entryDate: true,
       description: true,
+      yearClosing: { select: { id: true } },
       lines: {
         orderBy: { lineNo: "asc" },
         select: {
@@ -417,4 +425,12 @@ export async function getJournalEntry(
       },
     },
   });
+  if (!entry) return null;
+  return {
+    id: entry.id,
+    entryDate: entry.entryDate,
+    description: entry.description,
+    isOpening: entry.yearClosing !== null,
+    lines: entry.lines,
+  };
 }

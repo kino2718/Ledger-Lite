@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
 import { getFirstEntryDate, getJournalEntries } from "@/lib/journal/queries";
-import type { JournalEntryLineView } from "@/lib/journal/queries";
 import {
   currentYear,
   resolveYearSelection,
@@ -10,46 +9,10 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { LineColumn } from "./LineColumn";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
-
-// 借方・貸方それぞれの明細を縦に並べる（科目名＋補助科目と金額）。
-function LineColumn({
-  label,
-  lines,
-}: {
-  label: string;
-  lines: JournalEntryLineView[];
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-xs font-medium text-zinc-400">{label}</p>
-      {lines.length === 0 ? (
-        <p className="text-sm text-zinc-300 dark:text-zinc-600">—</p>
-      ) : (
-        lines.map((line, i) => (
-          <div
-            key={i}
-            className="flex items-baseline justify-between gap-2 text-sm"
-          >
-            <span className="min-w-0 truncate text-zinc-800 dark:text-zinc-200">
-              {line.accountName}
-              {line.subAccountName && (
-                <span className="ml-1 text-xs text-zinc-400">
-                  / {line.subAccountName}
-                </span>
-              )}
-            </span>
-            <span className="shrink-0 tabular-nums text-zinc-600 dark:text-zinc-400">
-              {yen(line.amount)}
-            </span>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
 
 export default async function JournalListPage({
   searchParams,
@@ -134,8 +97,16 @@ export default async function JournalListPage({
                   >
                     <div className="mb-3 flex items-baseline justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-zinc-800 dark:text-zinc-200">
-                          {entry.description ?? "（摘要なし）"}
+                        <p className="flex items-baseline gap-2 text-zinc-800 dark:text-zinc-200">
+                          <span className="truncate">
+                            {entry.description ?? "（摘要なし）"}
+                          </span>
+                          {/* 年度締めで作られた繰越仕訳の目印。 */}
+                          {entry.isOpening && (
+                            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                              繰越
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-zinc-400">{entry.entryDate}</p>
                       </div>

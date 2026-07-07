@@ -214,6 +214,8 @@ describe("deleteJournalEntry", () => {
 
   test("存在しない ID は { ok: false }", async () => {
     const { user } = await setup();
-    expect(await deleteJournalEntry(user.id, 9999)).toEqual({ ok: false });
+    const result = await deleteJournalEntry(user.id, 9999);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("見つかりません");
   });
 });

@@ -2,6 +2,7 @@
 // 検証ロジックは lib/journal/validation.ts に委ね、ここは「マスタ取得→検証→保存」を束ねる。
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { yearOf } from "@/lib/ledger/period";
 import {
   validateAgainstMasters,
   validateJournalEntry,
@@ -15,7 +16,32 @@ export type CreateJournalEntryResult =
 // 更新も成功時に対象 ID を返すため、作成と同じ形にする。
 export type UpdateJournalEntryResult = CreateJournalEntryResult;
 
-export type DeleteJournalEntryResult = { ok: true } | { ok: false };
+// 削除も失敗の理由を返す（繰越仕訳・締め済みの年は削除できない、など）。
+export type DeleteJournalEntryResult =
+  | { ok: true }
+  | { ok: false; errors: string[] };
+
+// 締め済みの年の仕訳と、締めで作られた繰越仕訳を変更から守るためのエラー。
+const CLOSED_YEAR_ERROR =
+  "締め済みの年の仕訳は変更できません。先に締め解除してください。";
+const OPENING_ENTRY_ERROR =
+  "繰越仕訳は編集・削除できません。締め解除で取り消してください。";
+
+// 最後に締めた年を返す（締めが無ければ null）。
+// 締めは古い年から順にしか行えないため、この年以前はすべて締め済みとみなせる。
+async function latestClosedYear(userId: number): Promise<number | null> {
+  const latest = await prisma.yearClosing.findFirst({
+    where: { userId },
+    orderBy: { year: "desc" },
+    select: { year: true },
+  });
+  return latest?.year ?? null;
+}
+
+// 取引日が締め済みの年（最後に締めた年以前）に入っているかを判定する。
+function inClosedYears(entryDate: string, closedYear: number | null): boolean {
+  return closedYear !== null && yearOf(entryDate) <= closedYear;
+}
 
 // 入力単体の検証＋ユーザー所有マスタとの整合検証をまとめて行い、エラーを返す。
 // エラーが空なら検証通過。作成・更新で共通に使う。
@@ -66,6 +92,11 @@ export async function createJournalEntry(
   input: JournalEntryInput,
 ): Promise<CreateJournalEntryResult> {
   const errors = await collectValidationErrors(userId, input);
+
+  // 締め済みの年には追加できない（繰越額が確定済みのため）。
+  if (inClosedYears(input.entryDate, await latestClosedYear(userId))) {
+    errors.push(CLOSED_YEAR_ERROR);
+  }
   if (errors.length > 0) {
     return { ok: false, errors };
   }
@@ -102,10 +133,24 @@ export async function updateJournalEntry(
   // 対象が存在し、かつこのユーザーの所有であることを確認する。
   const existing = await prisma.journalEntry.findFirst({
     where: { id, userId },
-    select: { id: true },
+    select: { id: true, entryDate: true, yearClosing: { select: { id: true } } },
   });
   if (!existing) {
     return { ok: false, errors: ["対象の仕訳が見つかりません。"] };
+  }
+
+  // 締めで作られた繰越仕訳は編集できない（締め解除でのみ消える）。
+  if (existing.yearClosing) {
+    return { ok: false, errors: [OPENING_ENTRY_ERROR] };
+  }
+  // 締め済みの年の仕訳は変更できない。締め済みの年への移動もできない
+  // （変更前・変更後どちらの取引日も締め済みの年に入っていないこと）。
+  const closedYear = await latestClosedYear(userId);
+  if (
+    inClosedYears(existing.entryDate, closedYear) ||
+    inClosedYears(input.entryDate, closedYear)
+  ) {
+    return { ok: false, errors: [CLOSED_YEAR_ERROR] };
   }
 
   await prisma.$transaction([
@@ -127,22 +172,37 @@ export async function updateJournalEntry(
 
 /**
  * 仕訳を物理削除する。所有者の仕訳だけを対象にし、明細は Cascade で連動削除される。
- * 該当が無ければ（他ユーザーの仕訳や存在しない ID）{ ok: false }。
+ * 該当が無い（他ユーザーの仕訳や存在しない ID）、繰越仕訳、締め済みの年の仕訳は
+ * 削除できず { ok: false }。
  */
 export async function deleteJournalEntry(
   userId: number,
   id: number,
 ): Promise<DeleteJournalEntryResult> {
-  // where に userId を含めることで所有スコープを担保する。
-  // deleteMany は該当 0 件でも例外にならず、消えた件数を返す。
+  // 対象が存在し、かつこのユーザーの所有であることを確認する。
+  const existing = await prisma.journalEntry.findFirst({
+    where: { id, userId },
+    select: { entryDate: true, yearClosing: { select: { id: true } } },
+  });
+  if (!existing) {
+    return { ok: false, errors: ["対象の仕訳が見つかりません。"] };
+  }
+
+  // 締めで作られた繰越仕訳は削除できない（締め解除でのみ消える）。
+  if (existing.yearClosing) {
+    return { ok: false, errors: [OPENING_ENTRY_ERROR] };
+  }
+  // 締め済みの年の仕訳は削除できない。
+  if (inClosedYears(existing.entryDate, await latestClosedYear(userId))) {
+    return { ok: false, errors: [CLOSED_YEAR_ERROR] };
+  }
+
   try {
-    const result = await prisma.journalEntry.deleteMany({
-      where: { id, userId },
-    });
-    return result.count > 0 ? { ok: true } : { ok: false };
+    await prisma.journalEntry.delete({ where: { id } });
+    return { ok: true };
   } catch {
-    // 年度締めの繰越仕訳は YearClosing から参照されており削除できない
-    // （締め解除で消す）。外部キー制約違反はエラー表示に倒す。
-    return { ok: false };
+    // 上の確認と削除の間に締めが行われた場合など。YearClosing が繰越仕訳を
+    // Restrict で参照しているため、外部キー制約違反はエラーに倒す。
+    return { ok: false, errors: [OPENING_ENTRY_ERROR] };
   }
 }

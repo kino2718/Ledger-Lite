@@ -7,7 +7,11 @@ vi.mock("server-only", () => ({}));
 import { prisma } from "@/lib/prisma";
 import { closeYear, previewCloseYear, reopenYear } from "@/lib/closing/manage";
 import { getAggregationStart, getYearClosings } from "@/lib/closing/queries";
-import { deleteJournalEntry } from "@/lib/journal/create";
+import {
+  createJournalEntry,
+  deleteJournalEntry,
+  updateJournalEntry,
+} from "@/lib/journal/create";
 import { getBalanceLines } from "@/lib/journal/queries";
 import { computeAccountBalances, normalBalanceSide } from "@/lib/ledger/balance";
 import type { AccountType, Side } from "@/lib/ledger/types";
@@ -588,13 +592,198 @@ describe("繰越仕訳の保護", () => {
     const closed = await closeYear(alice.id, 2025);
     if (!closed.ok) throw new Error("前提の締めに失敗");
 
-    // YearClosing が Restrict で参照しているため削除は失敗し、仕訳は残る。
     const result = await deleteJournalEntry(alice.id, closed.openingEntryId);
-    expect(result).toEqual({ ok: false });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("繰越仕訳");
     expect(
       await prisma.journalEntry.findUnique({
         where: { id: closed.openingEntryId },
       }),
     ).not.toBeNull();
+  });
+
+  test("繰越仕訳は編集できない", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    await seed2025(alice.id, a);
+    const closed = await closeYear(alice.id, 2025);
+    if (!closed.ok) throw new Error("前提の締めに失敗");
+
+    // 貸借の揃った正しい入力でも、繰越仕訳そのものは更新を拒否する。
+    const result = await updateJournalEntry(alice.id, closed.openingEntryId, {
+      entryDate: "2026-01-01",
+      description: "前期繰越（改ざん）",
+      lines: [
+        { accountId: a.bank.id, subAccountId: null, side: "debit", amount: 1 },
+        {
+          accountId: a.capital.id,
+          subAccountId: null,
+          side: "credit",
+          amount: 1,
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("繰越仕訳");
+  });
+});
+
+// --- 締め済みの年のロック ---------------------------------------------------------
+
+describe("締め済みの年のロック", () => {
+  test("締め済みの年には仕訳を作成できない（締めていない年には作成できる）", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    await seed2025(alice.id, a);
+    await closeYear(alice.id, 2025);
+
+    const blocked = await createJournalEntry(alice.id, {
+      entryDate: "2025-12-15",
+      description: "締め済みの年への追記",
+      lines: [
+        {
+          accountId: a.bank.id,
+          subAccountId: null,
+          side: "debit",
+          amount: 1000,
+        },
+        {
+          accountId: a.sales.id,
+          subAccountId: null,
+          side: "credit",
+          amount: 1000,
+        },
+      ],
+    });
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.errors[0]).toContain("締め済み");
+
+    // 締めていない翌年には普通に作成できる。
+    const allowed = await createJournalEntry(alice.id, {
+      entryDate: "2026-02-01",
+      description: "翌年の売上",
+      lines: [
+        {
+          accountId: a.bank.id,
+          subAccountId: null,
+          side: "debit",
+          amount: 2000,
+        },
+        {
+          accountId: a.sales.id,
+          subAccountId: null,
+          side: "credit",
+          amount: 2000,
+        },
+      ],
+    });
+    expect(allowed.ok).toBe(true);
+  });
+
+  test("締め済みの年の仕訳は更新・削除できない", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    await seed2025(alice.id, a);
+    const sale = await createEntry(alice.id, "2025-11-01", "追加売上", [
+      { accountId: a.bank.id, side: "debit", amount: 10000 },
+      { accountId: a.sales.id, side: "credit", amount: 10000 },
+    ]);
+    await closeYear(alice.id, 2025);
+
+    const updated = await updateJournalEntry(alice.id, sale.id, {
+      entryDate: "2025-11-01",
+      description: "金額の修正",
+      lines: [
+        {
+          accountId: a.bank.id,
+          subAccountId: null,
+          side: "debit",
+          amount: 20000,
+        },
+        {
+          accountId: a.sales.id,
+          subAccountId: null,
+          side: "credit",
+          amount: 20000,
+        },
+      ],
+    });
+    expect(updated.ok).toBe(false);
+    if (!updated.ok) expect(updated.errors[0]).toContain("締め済み");
+
+    const deleted = await deleteJournalEntry(alice.id, sale.id);
+    expect(deleted.ok).toBe(false);
+    if (!deleted.ok) expect(deleted.errors[0]).toContain("締め済み");
+    expect(
+      await prisma.journalEntry.findUnique({ where: { id: sale.id } }),
+    ).not.toBeNull();
+  });
+
+  test("締めていない年の仕訳を締め済みの年へは移動できない", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    await seed2025(alice.id, a);
+    const entry2026 = await createEntry(alice.id, "2026-03-01", "今年の売上", [
+      { accountId: a.bank.id, side: "debit", amount: 5000 },
+      { accountId: a.sales.id, side: "credit", amount: 5000 },
+    ]);
+    await closeYear(alice.id, 2025);
+
+    // 取引日を締め済みの 2025 年に変える更新は拒否する。
+    const result = await updateJournalEntry(alice.id, entry2026.id, {
+      entryDate: "2025-06-15",
+      description: "今年の売上",
+      lines: [
+        {
+          accountId: a.bank.id,
+          subAccountId: null,
+          side: "debit",
+          amount: 5000,
+        },
+        {
+          accountId: a.sales.id,
+          subAccountId: null,
+          side: "credit",
+          amount: 5000,
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("締め済み");
+  });
+
+  test("締め解除すれば再び変更できる", async () => {
+    const alice = await createUser("alice@example.com");
+    const a = await createStandardAccounts(alice.id);
+    await seed2025(alice.id, a);
+    const sale = await createEntry(alice.id, "2025-11-01", "追加売上", [
+      { accountId: a.bank.id, side: "debit", amount: 10000 },
+      { accountId: a.sales.id, side: "credit", amount: 10000 },
+    ]);
+    await closeYear(alice.id, 2025);
+    await reopenYear(alice.id, 2025);
+
+    const updated = await updateJournalEntry(alice.id, sale.id, {
+      entryDate: "2025-11-01",
+      description: "金額の修正",
+      lines: [
+        {
+          accountId: a.bank.id,
+          subAccountId: null,
+          side: "debit",
+          amount: 20000,
+        },
+        {
+          accountId: a.sales.id,
+          subAccountId: null,
+          side: "credit",
+          amount: 20000,
+        },
+      ],
+    });
+    expect(updated.ok).toBe(true);
+
+    const deleted = await deleteJournalEntry(alice.id, sale.id);
+    expect(deleted.ok).toBe(true);
   });
 });
