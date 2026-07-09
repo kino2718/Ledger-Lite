@@ -3,6 +3,12 @@ import Credentials from "next-auth/providers/credentials";
 import { authorizeCredentials } from "@/lib/credentials";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // 本番モード（next start）では既定で Host ヘッダを信頼せず、認証が全部
+  // 拒否される（UntrustedHost エラー）。このアプリはローカル・単一ユーザー
+  // 前提で、Host を偽装できる人＝利用者本人しかいないため信頼してよい。
+  // インターネットに公開する構成へ変える場合はこの前提が崩れるので、
+  // Host を検証するリバースプロキシを前段に置くか AUTH_URL で固定すること。
+  trustHost: true,
   // Credentials ではセッションは JWT 方式（DB セッション/アダプタは併用不可）。
   session: { strategy: "jwt" },
   // 既定の /api/auth/signin ではなく自作のログインページを使う。
