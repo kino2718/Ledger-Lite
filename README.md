@@ -185,7 +185,10 @@ $ npm run dev
 
 ## 使用する環境変数
 
-- `DATABASE_URL`: SQLite データベースファイルの場所。例: `file:./dev.db`
+- `DATABASE_URL`: SQLite データベースファイルの場所。例: `file:./dev.db`。
+  本番モード用に `.env.production` で `file:./prod.db` に上書きします
+  （Next.js は `next start` / `next build` のとき `.env.production` を
+  `.env` より優先して読みます。「ビルドと本番起動」を参照）。
 - `AUTH_SECRET`: Auth.js（NextAuth）のセッション署名用シークレット。
   `openssl rand -base64 32` で生成します。
 - `SEED_EMAIL`: seed で作成するユーザーのログイン ID（メールアドレス）。
@@ -236,20 +239,40 @@ ESLint（`eslint-config-next`）で静的解析を行います。
 
 ## ビルドと本番起動
 
+本番モードでは開発用の `dev.db` とは別の、本番用データベース `prod.db` を
+使います。トップディレクトリに `.env.production` を作成し、以下を設定します
+（Next.js が `next start` / `next build` のときだけ `.env` より優先して
+読み込みます。このファイルも `.env` 同様コミットしません）。
+
 ```bash
-$ npm run build   # 本番ビルド
-$ npm start       # ビルド済みアプリの起動
+DATABASE_URL="file:./prod.db"
 ```
+
+初回は本番用データベースを作成してから起動します。
+
+```bash
+$ npm run migrate:prod   # prod.db を作成しマイグレーションを適用
+$ npm run seed:prod      # ユーザーと標準勘定科目を投入
+$ npm run build          # 本番ビルド
+$ npm start              # ビルド済みアプリの起動
+```
+
+2 回目以降は `npm start` だけで起動できます。開発を続けてスキーマが
+変わった（マイグレーションが増えた）場合は、`npm run migrate:prod` を
+再実行してから起動してください。
 
 起動後は開発時と同じく [http://localhost:3000](http://localhost:3000)
 でアクセスできます。
 
 本番モードで動かす場合の注意:
 
-- **データベースは開発時と同じものを使います。** `.env` の `DATABASE_URL`
-  が指すファイル（例: `dev.db`）をそのまま読むため、サンプル仕訳を入れて
-  いた場合はそれが表示されます。実データの記帳を始める際は、本番用の
-  DB ファイルへの切り替えを検討してください。
+- **`prod.db` に直接 `prisma migrate dev` を使わないでください。**
+  開発用コマンドは DB のリセット（全データ削除）を対話で提案することが
+  あります。本番 DB への適用は `npm run migrate:prod`（中身は
+  `prisma migrate deploy`。適用だけを行い、リセットしない）を使います。
+- `npm run seed:sample`（開発用サンプル仕訳）は本番 DB には投入しません。
+- `prod.db` はバックアップ対象です。ファイルを 1 個コピーするだけで
+  丸ごとバックアップになります（年度締めの前後など節目での取得を推奨）。
 - **Host ヘッダの扱い**: Auth.js は本番モードでは既定で Host ヘッダを
   信頼せず、ログインできません（UntrustedHost エラー）。本アプリは
   ローカル個人利用の前提で `auth.ts` に `trustHost: true` を設定して

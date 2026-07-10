@@ -10,7 +10,9 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "seed:sample": "tsx prisma/seed-sample.ts"
+    "seed:sample": "tsx prisma/seed-sample.ts",
+    "migrate:prod": "DATABASE_URL=file:./prod.db prisma migrate deploy",
+    "seed:prod": "DATABASE_URL=file:./prod.db prisma db seed"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",
