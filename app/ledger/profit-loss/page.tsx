@@ -202,7 +202,7 @@ function AccountRow({
   row,
   yearParamValue,
 }: {
-  row: { accountId: number; code: string; name: string; balance: number };
+  row: { accountId: number; name: string; balance: number };
   yearParamValue: string;
 }) {
   return (
@@ -212,11 +212,6 @@ function AccountRow({
           href={`/ledger/${row.accountId}?year=${yearParamValue}`}
           className="inline-flex items-baseline gap-2 text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-zinc-50"
         >
-          {row.code && (
-            <span className="text-xs tabular-nums text-zinc-400">
-              {row.code}
-            </span>
-          )}
           <span>{row.name}</span>
         </Link>
       </td>

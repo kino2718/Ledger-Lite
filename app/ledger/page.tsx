@@ -159,11 +159,6 @@ export default async function LedgerIndexPage({
                   className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-black/4 dark:hover:bg-white/6"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
-                    {account.code && (
-                      <span className="shrink-0 text-xs tabular-nums text-zinc-400">
-                        {account.code}
-                      </span>
-                    )}
                     <span className="truncate text-zinc-800 dark:text-zinc-200">
                       {account.name}
                     </span>

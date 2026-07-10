@@ -146,12 +146,9 @@ export default async function LedgerPage({
       </header>
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
-        {/* 科目の見出し（コード・分類・現在残高） */}
+        {/* 科目の見出し（分類・現在残高） */}
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {account.code && (
-              <span className="tabular-nums">{account.code}・</span>
-            )}
             {ACCOUNT_TYPE_LABEL[account.accountType]}
           </p>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">

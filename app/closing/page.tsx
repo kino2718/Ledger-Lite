@@ -23,7 +23,6 @@ const formatDateTime = (d: Date) =>
 
 // 繰越仕訳プレビューの表示用 1 行。
 type PreviewRow = {
-  code: string;
   name: string;
   subName: string | null;
   amount: number;
@@ -77,7 +76,6 @@ export default async function ClosingPage() {
     lines.map((line) => {
       const account = accountById.get(line.accountId);
       return {
-        code: account?.code ?? "",
         name: account?.name ?? "(不明な科目)",
         subName:
           line.subAccountId !== null
@@ -289,11 +287,6 @@ function PreviewColumn({ label, rows }: { label: string; rows: PreviewRow[] }) {
               >
                 <td className="px-3 py-1.5">
                   <span className="inline-flex items-baseline gap-2 text-zinc-800 dark:text-zinc-200">
-                    {row.code && (
-                      <span className="text-xs tabular-nums text-zinc-400">
-                        {row.code}
-                      </span>
-                    )}
                     <span>
                       {row.name}
                       {row.subName && (

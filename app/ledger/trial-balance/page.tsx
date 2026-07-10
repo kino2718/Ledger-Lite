@@ -154,11 +154,6 @@ export default async function TrialBalancePage({
                         href={`/ledger/${row.accountId}?year=${yearParamValue}`}
                         className="inline-flex items-baseline gap-2 text-zinc-800 transition-colors hover:text-black dark:text-zinc-200 dark:hover:text-zinc-50"
                       >
-                        {row.code && (
-                          <span className="text-xs tabular-nums text-zinc-400">
-                            {row.code}
-                          </span>
-                        )}
                         <span>{row.name}</span>
                         <span className="text-xs text-zinc-400">
                           {ACCOUNT_TYPE_LABEL[row.accountType]}
