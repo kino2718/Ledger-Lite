@@ -17,32 +17,64 @@ type AccountSeed = {
 };
 
 const ACCOUNTS: AccountSeed[] = [
+  // 資産
   { code: "100", name: "現金", accountType: "asset" },
-  { code: "101", name: "普通預金", accountType: "asset" },
-  { code: "102", name: "売掛金", accountType: "asset" },
-  { code: "103", name: "預け金", accountType: "asset" },
+  { code: "101", name: "当座預金", accountType: "asset" },
+  { code: "102", name: "定期預金", accountType: "asset" },
+  { code: "103", name: "普通預金", accountType: "asset" },
+  { code: "104", name: "受取手形", accountType: "asset" },
+  { code: "105", name: "売掛金", accountType: "asset" },
+  { code: "106", name: "有価証券", accountType: "asset" },
+  { code: "107", name: "棚卸資産", accountType: "asset" },
+  { code: "108", name: "前払金", accountType: "asset" },
+  { code: "109", name: "貸付金", accountType: "asset" },
+  { code: "110", name: "建物", accountType: "asset" },
+  { code: "111", name: "建物附属設備", accountType: "asset" },
+  { code: "112", name: "機械装置", accountType: "asset" },
+  { code: "113", name: "車両運搬具", accountType: "asset" },
+  { code: "114", name: "工具 器具 備品", accountType: "asset" },
+  { code: "115", name: "土地", accountType: "asset" },
+  // 貸倒引当金は資産の評価勘定（売掛金等のマイナス）のため通常残高は貸方。
+  // 貸借対照表では貸方側（負債・純資産の部）に表示され、決算書の様式と揃う。
+  { code: "116", name: "貸倒引当金", accountType: "asset", normalSide: "credit" },
+  // 負債
+  { code: "200", name: "支払手形", accountType: "liability" },
+  { code: "201", name: "買掛金", accountType: "liability" },
+  { code: "202", name: "借入金", accountType: "liability" },
+  { code: "203", name: "未払金", accountType: "liability" },
+  { code: "204", name: "前受金", accountType: "liability" },
+  { code: "205", name: "預り金", accountType: "liability" },
+  // 純資産
   // 事業主貸は純資産だが評価勘定のため通常残高は借方（引出しを借方に積む）。
   { code: "300", name: "事業主貸", accountType: "equity", normalSide: "debit" },
   { code: "301", name: "事業主借", accountType: "equity" },
   { code: "302", name: "元入金", accountType: "equity" },
+  // 収益
   { code: "400", name: "売上高", accountType: "revenue" },
+  // 費用
+  { code: "500", name: "仕入", accountType: "expense" },
+  { code: "501", name: "租税公課", accountType: "expense" },
+  { code: "502", name: "荷造運賃", accountType: "expense" },
   {
-    code: "500",
-    name: "通信費",
-    accountType: "expense",
-    subAccounts: [
-      "インターネット家事共有",
-      "インターネット仕事のみ",
-      "郵便・宅急便",
-    ],
-  },
-  {
-    code: "501",
+    code: "503",
     name: "水道光熱費",
     accountType: "expense",
-    subAccounts: ["水道", "ガス", "電気", "ガス・電気"],
+    subAccounts: ["水道", "ガス", "電気"],
   },
-  { code: "502", name: "地代家賃", accountType: "expense" },
+  { code: "504", name: "旅費交通費", accountType: "expense" },
+  { code: "505", name: "通信費", accountType: "expense" },
+  { code: "506", name: "広告宣伝費", accountType: "expense" },
+  { code: "507", name: "接待交際費", accountType: "expense" },
+  { code: "508", name: "損害保険料", accountType: "expense" },
+  { code: "509", name: "修繕費", accountType: "expense" },
+  { code: "510", name: "消耗品費", accountType: "expense" },
+  { code: "511", name: "減価償却費", accountType: "expense" },
+  { code: "512", name: "福利厚生費", accountType: "expense" },
+  { code: "513", name: "給料賃金", accountType: "expense" },
+  { code: "514", name: "外注工賃", accountType: "expense" },
+  { code: "515", name: "利子割引料", accountType: "expense" },
+  { code: "516", name: "地代家賃", accountType: "expense" },
+  { code: "517", name: "貸倒金", accountType: "expense" },
 ];
 
 async function seedAccounts(userId: number) {

@@ -34,7 +34,7 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
     entryDate: "2025-06-01",
     description: "開業時の元手",
     lines: [
-      { code: "101", side: "debit", amount: 1_000_000 }, // 普通預金
+      { code: "103", side: "debit", amount: 1_000_000 }, // 普通預金
       { code: "302", side: "credit", amount: 1_000_000 }, // 元入金
     ],
   },
@@ -42,15 +42,15 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
     entryDate: "2025-06-01",
     description: "6月分 事務所家賃",
     lines: [
-      { code: "502", side: "debit", amount: 80_000 }, // 地代家賃
-      { code: "101", side: "credit", amount: 80_000 }, // 普通預金
+      { code: "516", side: "debit", amount: 80_000 }, // 地代家賃
+      { code: "103", side: "credit", amount: 80_000 }, // 普通預金
     ],
   },
   {
     entryDate: "2025-07-05",
     description: "売上計上（掛）",
     lines: [
-      { code: "102", side: "debit", amount: 200_000 }, // 売掛金
+      { code: "105", side: "debit", amount: 200_000 }, // 売掛金
       { code: "400", side: "credit", amount: 200_000 }, // 売上高
     ],
   },
@@ -58,24 +58,24 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
     entryDate: "2025-07-20",
     description: "売掛金の回収",
     lines: [
-      { code: "101", side: "debit", amount: 200_000 }, // 普通預金
-      { code: "102", side: "credit", amount: 200_000 }, // 売掛金
+      { code: "103", side: "debit", amount: 200_000 }, // 普通預金
+      { code: "105", side: "credit", amount: 200_000 }, // 売掛金
     ],
   },
   {
     entryDate: "2025-08-10",
     description: "インターネット利用料",
     lines: [
-      { code: "500", sub: "インターネット仕事のみ", side: "debit", amount: 5_000 }, // 通信費
-      { code: "101", side: "credit", amount: 5_000 }, // 普通預金
+      { code: "505", side: "debit", amount: 5_000 }, // 通信費
+      { code: "103", side: "credit", amount: 5_000 }, // 普通預金
     ],
   },
   {
     entryDate: "2025-09-12",
     description: "電気料金",
     lines: [
-      { code: "501", sub: "電気", side: "debit", amount: 8_000 }, // 水道光熱費
-      { code: "101", side: "credit", amount: 8_000 }, // 普通預金
+      { code: "503", sub: "電気", side: "debit", amount: 8_000 }, // 水道光熱費
+      { code: "103", side: "credit", amount: 8_000 }, // 普通預金
     ],
   },
   {
@@ -83,14 +83,14 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
     description: "生活費の引き出し",
     lines: [
       { code: "300", side: "debit", amount: 150_000 }, // 事業主貸
-      { code: "101", side: "credit", amount: 150_000 }, // 普通預金
+      { code: "103", side: "credit", amount: 150_000 }, // 普通預金
     ],
   },
   {
     entryDate: "2025-11-15",
     description: "郵送料を家計の現金で立て替え",
     lines: [
-      { code: "500", side: "debit", amount: 3_000 }, // 通信費
+      { code: "505", side: "debit", amount: 3_000 }, // 通信費
       { code: "301", side: "credit", amount: 3_000 }, // 事業主借
     ],
   },
@@ -111,15 +111,15 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
     entryDate: "2026-06-01",
     description: "6月分 事務所家賃",
     lines: [
-      { code: "502", side: "debit", amount: 80_000 }, // 地代家賃
-      { code: "101", side: "credit", amount: 80_000 }, // 普通預金
+      { code: "516", side: "debit", amount: 80_000 }, // 地代家賃
+      { code: "103", side: "credit", amount: 80_000 }, // 普通預金
     ],
   },
   {
     entryDate: "2026-06-05",
     description: "売上計上（掛）",
     lines: [
-      { code: "102", side: "debit", amount: 120_000 }, // 売掛金
+      { code: "105", side: "debit", amount: 120_000 }, // 売掛金
       { code: "400", side: "credit", amount: 120_000 }, // 売上高
     ],
   },
@@ -127,24 +127,24 @@ const SAMPLE_ENTRIES: SampleEntry[] = [
     entryDate: "2026-06-10",
     description: "インターネット利用料",
     lines: [
-      { code: "500", sub: "インターネット仕事のみ", side: "debit", amount: 5_000 }, // 通信費
-      { code: "101", side: "credit", amount: 5_000 }, // 普通預金
+      { code: "505", side: "debit", amount: 5_000 }, // 通信費
+      { code: "103", side: "credit", amount: 5_000 }, // 普通預金
     ],
   },
   {
     entryDate: "2026-06-12",
     description: "電気料金",
     lines: [
-      { code: "501", sub: "電気", side: "debit", amount: 8_000 }, // 水道光熱費
-      { code: "101", side: "credit", amount: 8_000 }, // 普通預金
+      { code: "503", sub: "電気", side: "debit", amount: 8_000 }, // 水道光熱費
+      { code: "103", side: "credit", amount: 8_000 }, // 普通預金
     ],
   },
   {
     entryDate: "2026-06-15",
     description: "売掛金の回収",
     lines: [
-      { code: "101", side: "debit", amount: 120_000 }, // 普通預金
-      { code: "102", side: "credit", amount: 120_000 }, // 売掛金
+      { code: "103", side: "debit", amount: 120_000 }, // 普通預金
+      { code: "105", side: "credit", amount: 120_000 }, // 売掛金
     ],
   },
   {
