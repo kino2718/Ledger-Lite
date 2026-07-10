@@ -73,11 +73,17 @@ export default async function LedgerIndexPage({
         );
 
   // 一覧に出す金額。その科目の元帳を同じ年で開いたときの最終残高と一致する。
+  const balanceMapFor = (account: (typeof accounts)[number]) =>
+    carriesBalanceForward(account.accountType) ? stockBalances : flowBalances;
   const balanceFor = (account: (typeof accounts)[number]) =>
-    (carriesBalanceForward(account.accountType)
-      ? stockBalances
-      : flowBalances
-    ).get(account.id) ?? 0;
+    balanceMapFor(account).get(account.id) ?? 0;
+
+  // 集計範囲に仕訳のある科目だけを一覧に出す（ダッシュボードと同じ基準）。
+  // 未使用の科目まで並べると標準の科目だけで 45 件になり探しづらいため。
+  // 差引ゼロでも仕訳があれば表示される。
+  const usedAccounts = accounts.filter((account) =>
+    balanceMapFor(account).has(account.id),
+  );
 
   // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。
   const years = yearOptions(
@@ -143,13 +149,15 @@ export default async function LedgerIndexPage({
           </div>
         </div>
 
-        {accounts.length === 0 ? (
+        {usedAccounts.length === 0 ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
-            勘定科目がまだありません。
+            {accounts.length === 0
+              ? "勘定科目がまだありません。"
+              : "この期間に仕訳のある科目はありません。"}
           </p>
         ) : (
           <ul className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
-            {accounts.map((account) => (
+            {usedAccounts.map((account) => (
               <li
                 key={account.id}
                 className="border-b border-black/5 last:border-0 dark:border-white/5"
