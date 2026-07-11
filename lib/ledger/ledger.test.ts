@@ -14,6 +14,7 @@ function src(
     side: partial.side,
     amount: partial.amount,
     siblings: partial.siblings ?? [],
+    subAccountName: partial.subAccountName,
   };
 }
 
@@ -128,5 +129,17 @@ describe("buildLedgerRows", () => {
       counterLabel: "現金",
     });
     expect(rows[1].counterLabel).toBe("諸口");
+  });
+
+  test("補助科目名は行に引き継ぐ（未指定なら null に揃える）", () => {
+    // 印刷用の元帳が摘要欄に補助科目名を添えるために使う。
+    const rows = buildLedgerRows({
+      lines: [
+        src({ side: "debit", amount: 8000, subAccountName: "電気" }),
+        src({ side: "debit", amount: 3000 }),
+      ],
+      normalSide: "debit",
+    });
+    expect(rows.map((r) => r.subAccountName)).toEqual(["電気", null]);
   });
 });

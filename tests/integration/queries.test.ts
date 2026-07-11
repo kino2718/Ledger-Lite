@@ -503,6 +503,8 @@ describe("getLedgerLines", () => {
       side: "debit",
       amount: 30000,
       siblings: [{ accountId: sales.id, accountName: "売上高" }],
+      // 補助科目を使っていない行の補助科目名は null。
+      subAccountName: null,
     });
     expect(lines[1]).toMatchObject({
       side: "credit",
@@ -557,6 +559,11 @@ describe("getLedgerLines", () => {
       amount: 8000,
       siblings: [{ accountId: cash.id, accountName: "現金" }],
     });
+
+    // 絞り込まずに科目全体を見たときも、各行に自分の補助科目名が付く
+    // （印刷用の元帳が摘要欄に添えるのに使う）。
+    const all = await getLedgerLines(alice.id, utility.id);
+    expect(all.map((l) => l.subAccountName)).toEqual(["電気", "水道"]);
   });
 
   test("他ユーザーの明細は含めない", async () => {
