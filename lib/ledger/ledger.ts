@@ -16,6 +16,9 @@ export type LedgerSourceLine = {
   description: string | null;
   side: Side;
   amount: number;
+  // この明細自身の補助科目名（無ければ null）。一括印刷の元帳で行に添える。
+  // 既存の呼び出し元・テストを壊さないよう省略も可にしておく。
+  subAccountName?: string | null;
   siblings: LedgerSibling[];
 };
 
@@ -25,6 +28,7 @@ export type LedgerRow = {
   entryId: number;
   entryDate: string;
   description: string | null;
+  subAccountName: string | null;
   counterLabel: string;
   debit: number;
   credit: number;
@@ -76,6 +80,7 @@ export function buildLedgerRows({
       entryId: line.entryId,
       entryDate: line.entryDate,
       description: line.description,
+      subAccountName: line.subAccountName ?? null,
       counterLabel: counterAccountLabel(line.siblings),
       debit: line.side === "debit" ? line.amount : 0,
       credit: line.side === "credit" ? line.amount : 0,

@@ -18,6 +18,8 @@ export type AccountSummary = {
   code: string | null;
   name: string;
   accountType: AccountType;
+  // 残高の積み上げ方向（元帳の一括印刷で buildLedgerRows に渡す）。
+  normalSide: Side;
 };
 
 /** ユーザーの勘定科目を科目コード順に取得する。 */
@@ -25,7 +27,13 @@ export async function getAccounts(userId: number): Promise<AccountSummary[]> {
   return prisma.account.findMany({
     where: { userId },
     orderBy: { code: "asc" },
-    select: { id: true, code: true, name: true, accountType: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      accountType: true,
+      normalSide: true,
+    },
   });
 }
 
@@ -191,6 +199,8 @@ export async function getLedgerLines(
       entryId: true,
       side: true,
       amount: true,
+      // この明細自身の補助科目名（元帳の行に添えて出す）。
+      subAccount: { select: { name: true } },
       // ── 2) 各明細の親の仕訳から日付・摘要を引く ──
       entry: {
         select: {
@@ -217,6 +227,7 @@ export async function getLedgerLines(
     description: line.entry.description,
     side: line.side,
     amount: line.amount,
+    subAccountName: line.subAccount?.name ?? null,
     siblings: line.entry.lines.map((sibling) => ({
       accountId: sibling.accountId,
       accountName: sibling.account.name,

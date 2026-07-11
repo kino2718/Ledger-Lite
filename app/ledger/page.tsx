@@ -146,6 +146,13 @@ export default async function LedgerIndexPage({
             >
               貸借対照表
             </Link>
+            {/* 全科目の元帳を 1 ページに並べた印刷用ビューへの導線。 */}
+            <Link
+              href={`/ledger/print?year=${yearParamValue}`}
+              className="whitespace-nowrap rounded-full border border-black/12 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              元帳を印刷
+            </Link>
           </div>
         </div>
 
