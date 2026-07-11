@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/session";
 import { getFirstEntryDate, getJournalEntries } from "@/lib/journal/queries";
+import type { JournalEntryRow } from "@/lib/journal/queries";
 import {
   currentYear,
   resolveYearSelection,
@@ -14,6 +15,50 @@ import { LineColumn } from "./LineColumn";
 
 // 金額を「¥1,234」形式に整形する。
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+
+// 仕訳 1 件分のカード。画面用（新しい順）と印刷用（古い順）の
+// 両方のリストから使い回す。
+function EntryCard({ entry }: { entry: JournalEntryRow }) {
+  // 仕訳帳スタイル：借方を左・貸方を右に並べて科目まで一目で見えるようにする。
+  const debits = entry.lines.filter((l) => l.side === "debit");
+  const credits = entry.lines.filter((l) => l.side === "credit");
+  // 1 仕訳＝1 カード。印刷では途中で改ページさせない。
+  return (
+    <li className="break-inside-avoid">
+      <Link
+        href={`/journal/${entry.id}/edit`}
+        className="block rounded-2xl border border-black/8 bg-white p-4 shadow-sm transition-colors hover:border-black/20 print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950 dark:hover:border-white/30"
+      >
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-baseline gap-2 text-zinc-800 dark:text-zinc-200">
+              {/* 画面では 1 行に省略、印刷では折り返して全文を出す。 */}
+              <span className="truncate print:whitespace-normal">
+                {entry.description ?? "（摘要なし）"}
+              </span>
+              {/* 年度締めで作られた繰越仕訳の目印。 */}
+              {entry.isOpening && (
+                <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  繰越
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-zinc-400">{entry.entryDate}</p>
+          </div>
+          <span className="shrink-0 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+            {yen(entry.total)}
+          </span>
+        </div>
+        {/* スマホは借方・貸方を縦積み、PC（sm 以上）は左右に並べる。
+            印刷幅は sm 前後で揺れるため、紙では左右 2 列を明示する。 */}
+        <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 print:grid-cols-2">
+          <LineColumn label="借方" lines={debits} />
+          <LineColumn label="貸方" lines={credits} />
+        </div>
+      </Link>
+    </li>
+  );
+}
 
 export default async function JournalListPage({
   searchParams,
@@ -92,49 +137,21 @@ export default async function JournalListPage({
               : "仕訳はまだありません。「新規仕訳 +」から登録できます。"}
           </p>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {entries.map((entry) => {
-              // 仕訳帳スタイル：借方を左・貸方を右に並べて科目まで一目で見えるようにする。
-              const debits = entry.lines.filter((l) => l.side === "debit");
-              const credits = entry.lines.filter((l) => l.side === "credit");
-              // 1 仕訳＝1 カード。印刷では途中で改ページさせない。
-              return (
-                <li key={entry.id} className="break-inside-avoid">
-                  <Link
-                    href={`/journal/${entry.id}/edit`}
-                    className="block rounded-2xl border border-black/8 bg-white p-4 shadow-sm transition-colors hover:border-black/20 print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950 dark:hover:border-white/30"
-                  >
-                    <div className="mb-3 flex items-baseline justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="flex items-baseline gap-2 text-zinc-800 dark:text-zinc-200">
-                          {/* 画面では 1 行に省略、印刷では折り返して全文を出す。 */}
-                          <span className="truncate print:whitespace-normal">
-                            {entry.description ?? "（摘要なし）"}
-                          </span>
-                          {/* 年度締めで作られた繰越仕訳の目印。 */}
-                          {entry.isOpening && (
-                            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                              繰越
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-zinc-400">{entry.entryDate}</p>
-                      </div>
-                      <span className="shrink-0 font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                        {yen(entry.total)}
-                      </span>
-                    </div>
-                    {/* スマホは借方・貸方を縦積み、PC（sm 以上）は左右に並べる。
-                        印刷幅は sm 前後で揺れるため、紙では左右 2 列を明示する。 */}
-                    <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 print:grid-cols-2">
-                      <LineColumn label="借方" lines={debits} />
-                      <LineColumn label="貸方" lines={credits} />
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            {/* 画面用。直近の入力を確認しやすいよう新しい順に並べる。 */}
+            <ul className="flex flex-col gap-3 print:hidden">
+              {entries.map((entry) => (
+                <EntryCard key={entry.id} entry={entry} />
+              ))}
+            </ul>
+            {/* 印刷用。紙の仕訳帳の慣習に合わせて古い順に並べ替える。
+                画面では隠しておき、印刷時だけこちらを出す。 */}
+            <ul className="hidden flex-col gap-3 print:flex">
+              {entries.toReversed().map((entry) => (
+                <EntryCard key={entry.id} entry={entry} />
+              ))}
+            </ul>
+          </>
         )}
       </main>
     </div>
