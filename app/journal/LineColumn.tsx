@@ -23,7 +23,8 @@ export function LineColumn({
             key={i}
             className="flex items-baseline justify-between gap-2 text-sm"
           >
-            <span className="min-w-0 truncate text-zinc-800 dark:text-zinc-200">
+            {/* 画面では 1 行に省略、印刷では折り返して全文を出す。 */}
+            <span className="min-w-0 truncate text-zinc-800 print:whitespace-normal dark:text-zinc-200">
               {line.accountName}
               {line.subAccountName && (
                 <span className="ml-1 text-xs text-zinc-400">
