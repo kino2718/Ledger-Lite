@@ -23,6 +23,23 @@
   }
 }
 
+/* 印刷（PDF 保存）用のベース。主要ブラウザは印刷時をライト扱いで描画するが、
+   保証はされていないため、紙は常にライト配色になるよう明示的に固定する。
+   ダークモードの上書きより後に置くこと（同じ詳細度なので後勝ちにする）。 */
+@media print {
+  :root {
+    color-scheme: light;
+    --background: #ffffff;
+    --foreground: #171717;
+  }
+}
+
+/* 用紙は A4 縦・余白 15mm（帳簿の印刷は全ページこの前提でレイアウトする）。 */
+@page {
+  size: A4 portrait;
+  margin: 15mm;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
