@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/session";
 import { createJournalEntry } from "@/lib/journal/create";
@@ -9,7 +8,7 @@ import type { JournalFormState } from "@/lib/journal/form";
 
 // 仕訳入力フォームの Server Action。useActionState から呼ばれるため、
 // 第1引数に前回の state を受け取る。検証 NG なら errors を返し、
-// 成功時はダッシュボードへリダイレクトする。
+// 成功時は saved を返してフォームに留まる（連続入力できるようにする）。
 export async function createEntryAction(
   _prevState: JournalFormState | undefined,
   formData: FormData,
@@ -26,7 +25,7 @@ export async function createEntryAction(
     return { errors: result.errors };
   }
 
-  // ダッシュボードの集計を最新化してから遷移する。
+  // 遷移はしないが、次にダッシュボードを開いたとき集計が古くないようにする。
   revalidatePath("/");
-  redirect("/");
+  return { saved: true };
 }

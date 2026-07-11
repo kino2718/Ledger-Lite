@@ -120,8 +120,28 @@ export function JournalForm({
 }: JournalFormProps) {
   const [state, formAction, pending] = useActionState(action, undefined);
 
+  // 取引日は state で持つ。保存後 React がフォームを初期値に戻すため、
+  // 素のままだと連続入力のたびに今日の日付へ戻ってしまう。同じ日の仕訳を
+  // 続けて入れる場面が多いので、直前に使った日付を保つ。
+  const [entryDate, setEntryDate] = useState(
+    initialEntryDate ?? todayString(),
+  );
+
   // 編集時は既存明細から作った組を、新規時は空の 1 組から始める。
   const [pairs, setPairs] = useState<Pair[]>(initialPairs ?? [emptyPair()]);
+
+  // 保存に成功したら（作成フォームのみ。編集は成功時リダイレクト）、
+  // 明細を空に戻して次の仕訳をすぐ入力できるようにする。
+  // 摘要は React のフォームリセットで空に戻り、取引日は上の state が保つ。
+  // action の結果は毎回新しいオブジェクトなので、前回のレンダーで見た値と
+  // 比較して「新しい結果が来たとき」だけ処理する（レンダー中の state 調整）。
+  const [handledState, setHandledState] = useState(state);
+  if (state !== handledState) {
+    setHandledState(state);
+    if (state?.saved) {
+      setPairs([emptyPair()]);
+    }
+  }
 
   const updateSide = (
     index: number,
@@ -172,7 +192,8 @@ export function JournalForm({
             name="entryDate"
             type="date"
             required
-            defaultValue={initialEntryDate ?? todayString()}
+            value={entryDate}
+            onChange={(e) => setEntryDate(e.target.value)}
             className={inputClass}
           />
         </div>
@@ -293,6 +314,15 @@ export function JournalForm({
         >
           キャンセル
         </Link>
+        {/* 保存成功の合図。フォームに留まるので、伝わらないと二重入力しかねない。 */}
+        {state?.saved && !pending && (
+          <span
+            aria-live="polite"
+            className="text-sm text-emerald-600 dark:text-emerald-400"
+          >
+            保存しました。続けて入力できます。
+          </span>
+        )}
       </div>
     </form>
   );

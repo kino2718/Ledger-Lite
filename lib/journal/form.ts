@@ -5,9 +5,11 @@ import type { Side } from "@/lib/ledger/types";
 import type { JournalEntryInput, JournalLineInput } from "./validation";
 
 // 仕訳フォームの Server Action が useActionState 経由で返す状態。
-// 作成・編集で共通に使う（成功時はリダイレクトするため undefined を返す）。
+// 作成・編集で共通に使う。作成は成功時に saved を返してフォームに留まり
+// （連続入力のため）、編集は成功時にリダイレクトするため undefined を返す。
 export type JournalFormState = {
   errors?: string[];
+  saved?: boolean;
 };
 
 // フォーム入力中の片側（借方 or 貸方）の値。入力中は文字列で保持する。
