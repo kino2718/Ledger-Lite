@@ -16,6 +16,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { PrintButton } from "@/app/components/PrintButton";
 import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。0 は空欄にして罫線をすっきりさせる。
@@ -86,8 +87,9 @@ export default async function TrialBalancePage({
   const yearParamValue = selection === "all" ? "all" : String(selection);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <header className="border-b border-black/8 dark:border-white/10">
+    <div className="flex flex-1 flex-col bg-zinc-50 print:bg-white dark:bg-black">
+      {/* ナビゲーションは印刷物には不要なので隠す（帳票名は下の見出しが担う）。 */}
+      <header className="border-b border-black/8 print:hidden dark:border-white/10">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold tracking-tight text-black dark:text-zinc-50">
             試算表
@@ -101,9 +103,9 @@ export default async function TrialBalancePage({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 print:max-w-none print:px-0 print:py-0">
         {/* 年セレクタ。集計対象の年を切り替える（既定は今年）。 */}
-        <div className="mb-4">
+        <div className="mb-4 print:hidden">
           <YearFilter
             basePath="/ledger/trial-balance"
             years={years}
@@ -112,10 +114,14 @@ export default async function TrialBalancePage({
           />
         </div>
 
-        <p className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          合計残高試算表（
-          {selection === "all" ? allPeriodLabel(aggStart) : `${selection}年`}）
-        </p>
+        {/* この見出しが印刷物の表題を兼ねる（帳票名＋対象期間）。 */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-zinc-500 print:text-base print:font-semibold print:text-black dark:text-zinc-400">
+            合計残高試算表（
+            {selection === "all" ? allPeriodLabel(aggStart) : `${selection}年`}）
+          </p>
+          <PrintButton />
+        </div>
 
         {rows.length === 0 ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
@@ -124,12 +130,14 @@ export default async function TrialBalancePage({
               : "集計できる仕訳がまだありません。"}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
+          // 印刷時は角丸・影を外し、罫線を濃くして紙の帳票らしくする。
+          <div className="overflow-x-auto rounded-2xl border border-black/8 bg-white shadow-sm print:overflow-visible print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950">
             {/* 借方（合計・残高）｜科目｜貸方（残高・合計）の合計残高試算表。
-                min-w はスマホで列が潰れないための下限。PC では器いっぱいに広がる。 */}
-            <table className="w-full min-w-2xl text-sm">
+                min-w はスマホで列が潰れないための下限。PC では器いっぱいに広がる。
+                印刷（A4 縦）では下限を外して文字も一段小さくし、紙幅に収める。 */}
+            <table className="w-full min-w-2xl text-sm print:min-w-0 print:text-xs">
               <thead>
-                <tr className="border-b border-black/8 text-xs text-zinc-400 dark:border-white/10">
+                <tr className="border-b border-black/8 text-xs text-zinc-400 print:border-black/40 print:text-black dark:border-white/10">
                   <th className="px-4 py-2 text-right font-medium">借方合計</th>
                   <th className="px-3 py-2 text-right font-medium">借方残高</th>
                   <th className="px-4 py-2 text-left font-medium">科目</th>
@@ -141,7 +149,7 @@ export default async function TrialBalancePage({
                 {rows.map((row) => (
                   <tr
                     key={row.accountId}
-                    className="border-b border-black/5 last:border-0 dark:border-white/5"
+                    className="break-inside-avoid border-b border-black/5 last:border-0 print:border-black/25 dark:border-white/5"
                   >
                     <td className="px-4 py-2 text-right tabular-nums text-zinc-500 dark:text-zinc-400">
                       {yenOrBlank(row.debit)}
@@ -170,7 +178,7 @@ export default async function TrialBalancePage({
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-black/12 font-semibold dark:border-white/20">
+                <tr className="break-inside-avoid border-t-2 border-black/12 font-semibold print:border-black dark:border-white/20">
                   <td className="px-4 py-2 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
                     {yen(tb.totalDebit)}
                   </td>

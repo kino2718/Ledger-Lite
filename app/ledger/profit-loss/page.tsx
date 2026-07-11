@@ -19,6 +19,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { PrintButton } from "@/app/components/PrintButton";
 import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。
@@ -92,8 +93,9 @@ export default async function ProfitLossPage({
   const yearParamValue = selection === "all" ? "all" : String(selection);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <header className="border-b border-black/8 dark:border-white/10">
+    <div className="flex flex-1 flex-col bg-zinc-50 print:bg-white dark:bg-black">
+      {/* ナビゲーションは印刷物には不要なので隠す（帳票名は下の見出しが担う）。 */}
+      <header className="border-b border-black/8 print:hidden dark:border-white/10">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold tracking-tight text-black dark:text-zinc-50">
             損益計算書
@@ -107,9 +109,9 @@ export default async function ProfitLossPage({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 print:max-w-none print:px-0 print:py-0">
         {/* 年セレクタ。集計対象の年を切り替える（既定は今年）。 */}
-        <div className="mb-4">
+        <div className="mb-4 print:hidden">
           <YearFilter
             basePath="/ledger/profit-loss"
             years={years}
@@ -118,10 +120,14 @@ export default async function ProfitLossPage({
           />
         </div>
 
-        <p className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          損益計算書（
-          {selection === "all" ? allPeriodLabel(aggStart) : `${selection}年`}）
-        </p>
+        {/* この見出しが印刷物の表題を兼ねる（帳票名＋対象期間）。 */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-zinc-500 print:text-base print:font-semibold print:text-black dark:text-zinc-400">
+            損益計算書（
+            {selection === "all" ? allPeriodLabel(aggStart) : `${selection}年`}）
+          </p>
+          <PrintButton />
+        </div>
 
         {!hasContent ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
@@ -130,8 +136,9 @@ export default async function ProfitLossPage({
               : "集計できる仕訳がまだありません。"}
           </p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
-            <table className="w-full text-sm">
+          // 印刷時は角丸・影を外し、罫線を濃くして紙の帳票らしくする。
+          <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950">
+            <table className="w-full text-sm print:text-xs">
               <tbody>
                 {/* 収益の部 */}
                 <SectionHeader label="収益" />
@@ -157,7 +164,7 @@ export default async function ProfitLossPage({
               </tbody>
               <tfoot>
                 {/* 差引損益。青色申告決算書でいう特別控除前の所得にあたる。 */}
-                <tr className="border-t-2 border-black/12 dark:border-white/20">
+                <tr className="break-inside-avoid border-t-2 border-black/12 print:border-black dark:border-white/20">
                   <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">
                     差引損益
                     <span className="ml-2 text-xs font-normal text-zinc-400">
@@ -186,7 +193,7 @@ export default async function ProfitLossPage({
 // 「収益」「費用」の部の見出し行。
 function SectionHeader({ label }: { label: string }) {
   return (
-    <tr className="border-b border-black/8 dark:border-white/10">
+    <tr className="break-inside-avoid border-b border-black/8 print:border-black/40 dark:border-white/10">
       <td
         colSpan={2}
         className="bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400"
@@ -206,7 +213,7 @@ function AccountRow({
   yearParamValue: string;
 }) {
   return (
-    <tr className="border-b border-black/5 dark:border-white/5">
+    <tr className="break-inside-avoid border-b border-black/5 print:border-black/25 dark:border-white/5">
       <td className="px-4 py-2">
         <Link
           href={`/ledger/${row.accountId}?year=${yearParamValue}`}
@@ -225,7 +232,7 @@ function AccountRow({
 // 部の合計行。
 function SubtotalRow({ label, amount }: { label: string; amount: number }) {
   return (
-    <tr className="border-b border-black/8 dark:border-white/10">
+    <tr className="break-inside-avoid border-b border-black/8 print:border-black/40 dark:border-white/10">
       <td className="px-4 py-2 font-medium text-zinc-700 dark:text-zinc-300">
         {label}
       </td>

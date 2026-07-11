@@ -20,6 +20,7 @@ import {
   yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
+import { PrintButton } from "@/app/components/PrintButton";
 import { getAggregationStart } from "@/lib/closing/queries";
 
 // 金額を「¥1,234」形式に整形する。
@@ -113,8 +114,9 @@ export default async function BalanceSheetPage({
   const yearParamValue = selection === "all" ? "all" : String(selection);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <header className="border-b border-black/8 dark:border-white/10">
+    <div className="flex flex-1 flex-col bg-zinc-50 print:bg-white dark:bg-black">
+      {/* ナビゲーションは印刷物には不要なので隠す（帳票名は下の見出しが担う）。 */}
+      <header className="border-b border-black/8 print:hidden dark:border-white/10">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3">
           <h1 className="text-lg font-semibold tracking-tight text-black dark:text-zinc-50">
             貸借対照表
@@ -128,9 +130,9 @@ export default async function BalanceSheetPage({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 print:max-w-none print:px-0 print:py-0">
         {/* 年セレクタ。どの時点の貸借対照表を見るかを切り替える（既定は今年）。 */}
-        <div className="mb-4">
+        <div className="mb-4 print:hidden">
           <YearFilter
             basePath="/ledger/balance-sheet"
             years={years}
@@ -139,10 +141,14 @@ export default async function BalanceSheetPage({
           />
         </div>
 
-        <p className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          貸借対照表（
-          {selection === "all" ? "現在" : `${selection}年12月31日時点`}）
-        </p>
+        {/* この見出しが印刷物の表題を兼ねる（帳票名＋対象時点）。 */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-zinc-500 print:text-base print:font-semibold print:text-black dark:text-zinc-400">
+            貸借対照表（
+            {selection === "all" ? "現在" : `${selection}年12月31日時点`}）
+          </p>
+          <PrintButton />
+        </div>
 
         {!hasContent ? (
           <p className="rounded-2xl border border-black/8 bg-white py-12 text-center text-sm text-zinc-400 dark:border-white/10 dark:bg-zinc-950">
@@ -151,13 +157,15 @@ export default async function BalanceSheetPage({
               : "集計できる仕訳がまだありません。"}
           </p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 md:items-start">
+          // 印刷（A4 縦）は幅が md 未満の扱いになるため、左右 2 列を明示して
+          // 紙でも「資産｜負債・純資産」が並ぶ帳票の様式を保つ。
+          <div className="grid gap-4 md:grid-cols-2 md:items-start print:grid-cols-2 print:items-start print:gap-2">
             {/* 資産の部（借方側） */}
-            <section className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
-              <h2 className="border-b border-black/8 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400">
+            <section className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950">
+              <h2 className="border-b border-black/8 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 print:border-black/40 print:text-black dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400">
                 資産の部
               </h2>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm print:text-xs">
                 <tbody>
                   {debitRows.map((row) => (
                     <AccountRow
@@ -174,11 +182,11 @@ export default async function BalanceSheetPage({
             </section>
 
             {/* 負債・純資産の部（貸方側）。損益もここに入る。 */}
-            <section className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
-              <h2 className="border-b border-black/8 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400">
+            <section className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950">
+              <h2 className="border-b border-black/8 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 print:border-black/40 print:text-black dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400">
                 負債・純資産の部
               </h2>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm print:text-xs">
                 <tbody>
                   {creditRows.map((row) => (
                     <AccountRow
@@ -188,12 +196,12 @@ export default async function BalanceSheetPage({
                     />
                   ))}
                   {/* 集計期間の損益。貸借対照表では純資産の一部になる。 */}
-                  <tr className="border-b border-black/5 dark:border-white/5">
+                  <tr className="break-inside-avoid border-b border-black/5 print:border-black/25 dark:border-white/5">
                     <td className="px-4 py-2 text-zinc-800 dark:text-zinc-200">
                       {plLabel}
                       <Link
                         href={`/ledger/profit-loss?year=${yearParamValue}`}
-                        className="ml-2 text-xs text-zinc-400 transition-colors hover:text-black dark:hover:text-zinc-50"
+                        className="ml-2 text-xs text-zinc-400 transition-colors hover:text-black print:hidden dark:hover:text-zinc-50"
                       >
                         損益計算書 →
                       </Link>
@@ -242,7 +250,7 @@ function AccountRow({
   yearParamValue: string;
 }) {
   return (
-    <tr className="border-b border-black/5 dark:border-white/5">
+    <tr className="break-inside-avoid border-b border-black/5 print:border-black/25 dark:border-white/5">
       <td className="px-4 py-2">
         <Link
           href={`/ledger/${row.accountId}?year=${yearParamValue}`}
@@ -264,7 +272,7 @@ function AccountRow({
 // 部の合計行。
 function TotalRow({ label, amount }: { label: string; amount: number }) {
   return (
-    <tr className="border-t-2 border-black/12 dark:border-white/20">
+    <tr className="break-inside-avoid border-t-2 border-black/12 print:border-black dark:border-white/20">
       <td className="px-4 py-2 font-semibold text-zinc-900 dark:text-zinc-100">
         {label}
       </td>
