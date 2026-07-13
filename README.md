@@ -165,11 +165,13 @@ $ openssl rand -base64 32
 ```
 
 `SEED_PASSWORD_HASH` は、ログインに使う平文パスワードを bcrypt
-（コスト 12）でハッシュ化した値です。次のコマンドで生成し、出力された
-`$2b$...` の文字列を設定してください。
+（コスト 12）でハッシュ化した値です。次のコマンドを実行するとパスワードの
+入力を求められるので（画面には表示されません）、出力された `$2b$...` の
+文字列を設定してください。パスワードをコマンドラインに直接書かないため、
+シェルの履歴に平文が残りません。
 
 ```bash
-$ node -e "require('bcryptjs').hash('ここに平文パスワード', 12).then(console.log)"
+$ npm run hash:password
 ```
 
 ### 3. データベースの作成と初期データ投入
@@ -324,6 +326,8 @@ prisma/
   migrations/        マイグレーション
   seed.ts            本番用 seed（ユーザー・勘定科目）
   seed-sample.ts     開発用サンプル仕訳 seed
+scripts/
+  hash-password.ts   SEED_PASSWORD_HASH の生成（パスワードを隠して入力）
 tests/               テスト設定・統合テスト
 auth.ts              Auth.js の設定
 DATABASE.md          DB テーブルの仕様

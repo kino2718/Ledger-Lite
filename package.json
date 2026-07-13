@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "seed:sample": "tsx prisma/seed-sample.ts",
+    "hash:password": "tsx scripts/hash-password.ts",
     "migrate:prod": "DATABASE_URL=file:./prod.db prisma migrate deploy",
     "seed:prod": "DATABASE_URL=file:./prod.db prisma db seed"
   },

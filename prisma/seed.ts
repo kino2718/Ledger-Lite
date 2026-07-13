@@ -105,8 +105,8 @@ async function seedAccounts(userId: number) {
 
 async function main() {
   // パスワードは平文をソースに残さず、ハッシュ済みの値を環境変数から読む。
-  // ハッシュは lib/password.ts と同じ bcryptjs(cost 12) で生成すること。例:
-  //   node -e "require('bcryptjs').hash('生パスワード',12).then(console.log)"
+  // ハッシュは npm run hash:password で生成する（scripts/hash-password.ts。
+  // lib/password.ts と同じ bcryptjs・コスト 12。平文がシェル履歴に残らない）。
   const passwordHash = process.env.SEED_PASSWORD_HASH;
   if (!passwordHash) {
     throw new Error(
