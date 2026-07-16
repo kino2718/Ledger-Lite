@@ -12,9 +12,7 @@ import { DeleteEntryButton } from "../../DeleteEntryButton";
 import { LineColumn } from "../../LineColumn";
 import { linesToPairs } from "@/lib/journal/form";
 import { deleteEntryAction, updateEntryAction } from "./actions";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 export default async function EditJournalEntryPage({
   params,

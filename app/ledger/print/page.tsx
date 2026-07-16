@@ -24,9 +24,7 @@ import {
 import { YearFilter } from "@/app/components/YearFilter";
 import { PrintButton } from "@/app/components/PrintButton";
 import { getAggregationStart } from "@/lib/closing/queries";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 // 元帳テーブルの列幅。個別元帳よりひとまわり詰めて A4 縦の紙幅にも収める。
 const GRID_COLS = "grid-cols-[5.5rem_minmax(7rem,1fr)_6rem_6.5rem_6.5rem_7rem]";

@@ -18,9 +18,9 @@ import {
 import { YearFilter } from "@/app/components/YearFilter";
 import { PrintButton } from "@/app/components/PrintButton";
 import { getAggregationStart } from "@/lib/closing/queries";
+import { yen } from "@/lib/format";
 
-// 金額を「¥1,234」形式に整形する。0 は空欄にして罫線をすっきりさせる。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+// 0 は空欄にして罫線をすっきりさせる。
 const yenOrBlank = (n: number) => (n === 0 ? "" : yen(n));
 
 export default async function TrialBalancePage({

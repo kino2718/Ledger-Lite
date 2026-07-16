@@ -20,9 +20,7 @@ import {
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
 import { getAggregationStart } from "@/lib/closing/queries";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 export default async function LedgerIndexPage({
   searchParams,

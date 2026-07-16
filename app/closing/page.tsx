@@ -7,9 +7,7 @@ import type { CarryoverLine } from "@/lib/closing/carryover";
 import { currentYear, yearOf } from "@/lib/ledger/period";
 import { closeYearAction, reopenYearAction } from "./actions";
 import { ClosingButton } from "./ClosingButton";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 // 締めた日時の表示用（例: 2026/07/07 09:30）。
 const formatDateTime = (d: Date) =>

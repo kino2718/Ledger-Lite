@@ -1,7 +1,5 @@
 import type { JournalEntryLineView } from "@/lib/journal/queries";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 // 借方・貸方それぞれの明細を縦に並べる（科目名＋補助科目と金額）。
 // 仕訳一覧と、締め済みの仕訳の読み取り専用表示で共用する。

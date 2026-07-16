@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { AccountOption } from "@/lib/journal/queries";
 import type { JournalFormState, Pair, SideInput } from "@/lib/journal/form";
+import { yen } from "@/lib/format";
 
 const emptySide = (): SideInput => ({
   accountId: "",
@@ -22,8 +23,6 @@ function todayString(): string {
   const dd = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${mm}-${dd}`;
 }
-
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
 
 const inputClass =
   // w-full min-w-0: グリッド/フレックスのトラック幅に追従し、内容より小さくも縮めるようにする

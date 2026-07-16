@@ -20,9 +20,7 @@ import {
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
 import { getAggregationStart } from "@/lib/closing/queries";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 // 元帳テーブルの列幅。ヘッダーと各行で同じグリッドを使って桁を揃える。
 const GRID_COLS =

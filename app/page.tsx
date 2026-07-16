@@ -14,9 +14,7 @@ import {
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import { currentYear, yearRange } from "@/lib/ledger/period";
 import { getAggregationStart } from "@/lib/closing/queries";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 // 今月（取引日 YYYY-MM-DD 文字列）の範囲を返す。
 function currentMonthRange(now = new Date()) {

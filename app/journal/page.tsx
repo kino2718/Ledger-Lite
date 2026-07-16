@@ -12,9 +12,7 @@ import {
 import { YearFilter } from "@/app/components/YearFilter";
 import { PrintButton } from "@/app/components/PrintButton";
 import { LineColumn } from "./LineColumn";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 // 仕訳 1 件分のカード。画面用（新しい順）と印刷用（古い順）の
 // 両方のリストから使い回す。

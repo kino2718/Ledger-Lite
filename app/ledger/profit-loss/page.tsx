@@ -21,9 +21,7 @@ import {
 import { YearFilter } from "@/app/components/YearFilter";
 import { PrintButton } from "@/app/components/PrintButton";
 import { getAggregationStart } from "@/lib/closing/queries";
-
-// 金額を「¥1,234」形式に整形する。
-const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+import { yen } from "@/lib/format";
 
 export default async function ProfitLossPage({
   searchParams,
