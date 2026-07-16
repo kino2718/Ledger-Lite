@@ -8,7 +8,7 @@ import {
 } from "@/lib/journal/queries";
 import { getAggregationStart, getSubAccountNames } from "@/lib/closing/queries";
 import { JournalForm } from "../../JournalForm";
-import { DeleteEntryButton } from "../../DeleteEntryButton";
+import { DeleteButton } from "@/app/components/DeleteButton";
 import { LineColumn } from "../../LineColumn";
 import { linesToPairs } from "@/lib/journal/form";
 import { deleteEntryAction, updateEntryAction } from "./actions";
@@ -80,7 +80,10 @@ export default async function EditJournalEntryPage({
                 この仕訳を削除します。
               </p>
               {/* 対象 ID を結び付けた削除アクションを渡す。 */}
-              <DeleteEntryButton action={deleteEntryAction.bind(null, id)} />
+              <DeleteButton
+                action={deleteEntryAction.bind(null, id)}
+                confirmMessage="この仕訳を削除します。元に戻せません。よろしいですか？"
+              />
             </div>
           </>
         )}

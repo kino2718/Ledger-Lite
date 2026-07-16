@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DeleteAccountButton } from "./DeleteAccountButton";
+import { DeleteButton } from "./DeleteButton";
 
 // 削除アクションと window.confirm はどちらもモックにして、
 // 「確認の結果でアクションが実行されるか」だけを見る。
@@ -16,22 +16,27 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("DeleteAccountButton", () => {
+describe("DeleteButton", () => {
   test("確認で OK すると削除アクションが実行される", async () => {
     confirmMock.mockReturnValue(true);
     const user = userEvent.setup();
-    render(<DeleteAccountButton action={actionMock} />);
+    render(
+      <DeleteButton action={actionMock} confirmMessage="削除しますか？" />,
+    );
 
     await user.click(screen.getByRole("button", { name: "削除" }));
 
-    expect(confirmMock).toHaveBeenCalledTimes(1);
+    // 確認ダイアログにはページ側から渡した文言がそのまま出る。
+    expect(confirmMock).toHaveBeenCalledExactlyOnceWith("削除しますか？");
     await waitFor(() => expect(actionMock).toHaveBeenCalledTimes(1));
   });
 
   test("確認でキャンセルすると削除アクションは実行されない", async () => {
     confirmMock.mockReturnValue(false);
     const user = userEvent.setup();
-    render(<DeleteAccountButton action={actionMock} />);
+    render(
+      <DeleteButton action={actionMock} confirmMessage="削除しますか？" />,
+    );
 
     await user.click(screen.getByRole("button", { name: "削除" }));
 

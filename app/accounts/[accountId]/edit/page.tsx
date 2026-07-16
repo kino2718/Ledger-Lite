@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/session";
 import { getAccountForEdit } from "@/lib/accounts/queries";
 import { AccountForm } from "../../AccountForm";
-import { DeleteAccountButton } from "../../DeleteAccountButton";
+import { DeleteButton } from "@/app/components/DeleteButton";
 import { SubAccountItem } from "../../SubAccountItem";
 import { AddSubAccountForm } from "../../AddSubAccountForm";
 import {
@@ -112,8 +112,9 @@ export default async function EditAccountPage({
                 この科目は未使用のため削除できます。
               </p>
               {/* 対象 ID を結び付けた削除アクションを渡す。 */}
-              <DeleteAccountButton
+              <DeleteButton
                 action={deleteAccountAction.bind(null, account.id)}
+                confirmMessage="この科目を削除します。元に戻せません。よろしいですか？"
               />
             </>
           ) : (
