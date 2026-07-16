@@ -4,11 +4,8 @@ import { verifySession } from "@/lib/session";
 import {
   getFirstEntryDate,
   getLedgerAccount,
-  getLedgerLines,
-  getOpeningBalance,
+  getLedgerSection,
 } from "@/lib/journal/queries";
-import { buildLedgerRows } from "@/lib/ledger/ledger";
-import { carriesBalanceForward } from "@/lib/ledger/balance";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/ledger/types";
 import {
   allPeriodLabel,
@@ -16,7 +13,6 @@ import {
   resolveYearSelection,
   yearOf,
   yearOptions,
-  yearRange,
 } from "@/lib/ledger/period";
 import { YearFilter } from "@/app/components/YearFilter";
 import { getAggregationStart } from "@/lib/closing/queries";
@@ -66,41 +62,15 @@ export default async function LedgerPage({
     getAggregationStart(userId),
   ]);
 
-  // 年で絞ったときは、年初より前の残高を「前期繰越」として先頭に置く。
-  // ただし収益・費用は毎年ゼロから始まるため前期繰越を持たない。
-  // 前年を締めた年は集計開始＝年初なので 0 になり、代わりに繰越仕訳の行が出る。
-  const carriesForward = carriesBalanceForward(account.accountType);
-  const openingBalance =
-    selection === "all" || !carriesForward
-      ? 0
-      : await getOpeningBalance({
-          userId,
-          accountId: account.id,
-          normalSide: account.normalSide,
-          before: `${selection}-01-01`,
-          from: aggStart,
-          subAccountId: activeSub?.id,
-        });
-
-  // 明細を取得し、純粋関数で残高を積み上げて表示用の行に変換する。
-  const lines = await getLedgerLines(
-    userId,
-    accountId,
-    activeSub?.id,
-    selection === "all"
-      ? aggStart !== undefined
-        ? { from: aggStart }
-        : undefined
-      : yearRange(selection),
-  );
-  const rows = buildLedgerRows({
-    lines,
-    // 残高の向きは科目固有の通常残高（事業主貸などの評価勘定も正しく扱える）。
-    normalSide: account.normalSide,
-    openingBalance,
-  });
-  const closingBalance =
-    rows.length > 0 ? rows[rows.length - 1].balance : openingBalance;
+  // 前期繰越・明細行・期末残高を組み立てる（印刷用元帳と共通の処理）。
+  const { rows, openingBalance, closingBalance, showOpeningRow } =
+    await getLedgerSection({
+      userId,
+      account,
+      selection,
+      aggStart,
+      subAccountId: activeSub?.id,
+    });
 
   // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。
   const firstEntryDate = await getFirstEntryDate(userId);
@@ -110,10 +80,6 @@ export default async function LedgerPage({
     selection,
   );
 
-  // 前期繰越行は年で絞ったとき、繰り越す科目に残高がある場合だけ出す
-  // （前年を締めた年は繰越仕訳の行が出るので、この行は不要になる）。
-  const showOpeningRow =
-    selection !== "all" && carriesForward && openingBalance !== 0;
   const hasContent = rows.length > 0 || showOpeningRow;
 
   // 補助科目チップのリンク先。選択中の年を維持したまま補助科目を切り替える。

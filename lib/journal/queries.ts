@@ -4,9 +4,11 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AccountType, BalanceLine, Side } from "@/lib/ledger/types";
-import type { LedgerSourceLine } from "@/lib/ledger/ledger";
-import type { DateRange } from "@/lib/ledger/period";
-import { signedAmount } from "@/lib/ledger/balance";
+import { buildLedgerRows } from "@/lib/ledger/ledger";
+import type { LedgerRow, LedgerSourceLine } from "@/lib/ledger/ledger";
+import { yearRange } from "@/lib/ledger/period";
+import type { DateRange, YearSelection } from "@/lib/ledger/period";
+import { carriesBalanceForward, signedAmount } from "@/lib/ledger/balance";
 
 // 期間指定の型は年度ユーティリティ（lib/ledger/period.ts）に定義がある。
 // これまで通りこのモジュールからも使えるよう再公開しておく。
@@ -276,6 +278,73 @@ export async function getOpeningBalance(params: {
     });
   }
   return balance;
+}
+
+/**
+ * 科目 1 つ分の元帳表示に必要な一式（前期繰越・明細行・期末残高）を組み立てる。
+ * 個別元帳（/ledger/[accountId]）と印刷用元帳（/ledger/print）で共用し、
+ * 画面と印刷物で集計の食い違いが起きないようにする。
+ * - 年で絞ったときは年初より前の残高を前期繰越に置く。
+ *   ただし収益・費用は毎年ゼロから始まるため前期繰越を持たない。
+ * - 締め済みの年があれば aggStart（繰越仕訳の日付）から集計して二重計上を防ぐ。
+ *   前年を締めた年の前期繰越は 0 になり、代わりに繰越仕訳の行が出る。
+ */
+export async function getLedgerSection(params: {
+  userId: number;
+  account: { id: number; accountType: AccountType; normalSide: Side };
+  // 表示対象の年（"all" は全期間）。
+  selection: YearSelection;
+  // 年度締めに基づく集計開始日（getAggregationStart の結果。締めが無ければ undefined）。
+  aggStart?: string;
+  // 指定すると補助科目で絞る（未指定なら科目全体）。
+  subAccountId?: number;
+}): Promise<{
+  rows: LedgerRow[];
+  openingBalance: number;
+  closingBalance: number;
+  // 前期繰越行を出すか（年で絞り、繰り越す残高がある場合のみ）。
+  showOpeningRow: boolean;
+}> {
+  const { userId, account, selection, aggStart, subAccountId } = params;
+
+  const carriesForward = carriesBalanceForward(account.accountType);
+  const openingBalance =
+    selection === "all" || !carriesForward
+      ? 0
+      : await getOpeningBalance({
+          userId,
+          accountId: account.id,
+          normalSide: account.normalSide,
+          before: `${selection}-01-01`,
+          from: aggStart,
+          subAccountId,
+        });
+
+  const lines = await getLedgerLines(
+    userId,
+    account.id,
+    subAccountId,
+    selection === "all"
+      ? aggStart !== undefined
+        ? { from: aggStart }
+        : undefined
+      : yearRange(selection),
+  );
+  const rows = buildLedgerRows({
+    lines,
+    // 残高の向きは科目固有の通常残高（事業主貸などの評価勘定も正しく扱える）。
+    normalSide: account.normalSide,
+    openingBalance,
+  });
+
+  return {
+    rows,
+    openingBalance,
+    closingBalance:
+      rows.length > 0 ? rows[rows.length - 1].balance : openingBalance,
+    showOpeningRow:
+      selection !== "all" && carriesForward && openingBalance !== 0,
+  };
 }
 
 // 一覧・最近の仕訳に共通する見出し情報。total は借方合計（＝取引金額）。

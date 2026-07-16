@@ -4,10 +4,8 @@ import {
   getAccounts,
   getBalanceLines,
   getFirstEntryDate,
-  getLedgerLines,
-  getOpeningBalance,
+  getLedgerSection,
 } from "@/lib/journal/queries";
-import { buildLedgerRows } from "@/lib/ledger/ledger";
 import {
   carriesBalanceForward,
   computeAccountBalances,
@@ -81,52 +79,13 @@ export default async function LedgerPrintPage({
     ),
   );
 
-  // 明細の取得範囲。個別元帳（/ledger/[accountId]）と同じ。
-  const linePeriod =
-    selection === "all"
-      ? aggStart !== undefined
-        ? { from: aggStart }
-        : undefined
-      : yearRange(selection);
-
-  // 科目ごとに個別元帳と同じパイプラインで行を組み立てる。
+  // 科目ごとに個別元帳（/ledger/[accountId]）と共通の処理で行を組み立てる。
   // 補助科目では絞らず科目全体を出す（補助科目名は行に添える）。
   const sections = await Promise.all(
-    usedAccounts.map(async (account) => {
-      const carriesForward = carriesBalanceForward(account.accountType);
-      const openingBalance =
-        selection === "all" || !carriesForward
-          ? 0
-          : await getOpeningBalance({
-              userId,
-              accountId: account.id,
-              normalSide: account.normalSide,
-              before: `${selection}-01-01`,
-              from: aggStart,
-            });
-      const lines = await getLedgerLines(
-        userId,
-        account.id,
-        undefined,
-        linePeriod,
-      );
-      const rows = buildLedgerRows({
-        lines,
-        normalSide: account.normalSide,
-        openingBalance,
-      });
-      return {
-        account,
-        rows,
-        openingBalance,
-        closingBalance:
-          rows.length > 0 ? rows[rows.length - 1].balance : openingBalance,
-        // 前期繰越行は年で絞ったとき、繰り越す残高がある場合だけ出す
-        // （前年を締めた年は繰越仕訳の行が出るので、この行は不要になる）。
-        showOpeningRow:
-          selection !== "all" && carriesForward && openingBalance !== 0,
-      };
-    }),
+    usedAccounts.map(async (account) => ({
+      account,
+      ...(await getLedgerSection({ userId, account, selection, aggStart })),
+    })),
   );
 
   // 年セレクタの選択肢は「一番古い仕訳の年〜今年」（範囲外の選択年も含む）。

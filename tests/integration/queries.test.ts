@@ -12,6 +12,7 @@ import {
   getJournalEntry,
   getLedgerAccount,
   getLedgerLines,
+  getLedgerSection,
   getOpeningBalance,
   getRecentJournalEntries,
 } from "@/lib/journal/queries";
@@ -608,6 +609,130 @@ describe("getLedgerLines", () => {
 
     expect(june).toHaveLength(1);
     expect(june[0].amount).toBe(20000);
+  });
+});
+
+// --- getLedgerSection（元帳の組み立て。個別元帳と印刷用元帳で共用） -------------
+
+describe("getLedgerSection", () => {
+  // 前年に現金 22,000（30,000 − 8,000）、当年に 5,000 の入金がある共通データ。
+  async function setup() {
+    const alice = await createUser("alice@example.com");
+    const cash = await createAccount(alice.id, "100", "現金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    await createEntry(alice.id, "2025-06-10", "前年の売上", [
+      { accountId: cash.id, side: "debit", amount: 30000 },
+      { accountId: sales.id, side: "credit", amount: 30000 },
+    ]);
+    await createEntry(alice.id, "2025-12-31", "前年の値引", [
+      { accountId: sales.id, side: "debit", amount: 8000 },
+      { accountId: cash.id, side: "credit", amount: 8000 },
+    ]);
+    await createEntry(alice.id, "2026-02-01", "当年の売上", [
+      { accountId: cash.id, side: "debit", amount: 5000 },
+      { accountId: sales.id, side: "credit", amount: 5000 },
+    ]);
+    return { alice, cash, sales };
+  }
+
+  test("年で絞ると前期繰越から当年の明細だけを積み上げる", async () => {
+    const { alice, cash } = await setup();
+
+    const section = await getLedgerSection({
+      userId: alice.id,
+      account: { id: cash.id, accountType: "asset", normalSide: "debit" },
+      selection: 2026,
+    });
+
+    expect(section.openingBalance).toBe(22000);
+    expect(section.showOpeningRow).toBe(true);
+    expect(section.rows.map((r) => r.description)).toEqual(["当年の売上"]);
+    // 残高は前期繰越 22,000 に当年分を足したところから始まる。
+    expect(section.rows[0].balance).toBe(27000);
+    expect(section.closingBalance).toBe(27000);
+  });
+
+  test("全期間なら前期繰越を持たず、全明細を積み上げる", async () => {
+    const { alice, cash } = await setup();
+
+    const section = await getLedgerSection({
+      userId: alice.id,
+      account: { id: cash.id, accountType: "asset", normalSide: "debit" },
+      selection: "all",
+    });
+
+    expect(section.openingBalance).toBe(0);
+    expect(section.showOpeningRow).toBe(false);
+    expect(section.rows.map((r) => r.description)).toEqual([
+      "前年の売上",
+      "前年の値引",
+      "当年の売上",
+    ]);
+    expect(section.closingBalance).toBe(27000);
+  });
+
+  test("収益・費用は年で絞っても前期繰越を持たない（毎年ゼロから）", async () => {
+    const { alice, sales } = await setup();
+
+    const section = await getLedgerSection({
+      userId: alice.id,
+      account: { id: sales.id, accountType: "revenue", normalSide: "credit" },
+      selection: 2026,
+    });
+
+    expect(section.openingBalance).toBe(0);
+    expect(section.showOpeningRow).toBe(false);
+    expect(section.rows.map((r) => r.description)).toEqual(["当年の売上"]);
+    expect(section.closingBalance).toBe(5000);
+  });
+
+  test("aggStart（前年を締めた年）では前期繰越行を出さない", async () => {
+    const { alice, cash } = await setup();
+
+    // 前年を締めると集計開始＝年初になり、年初より前は合計されない。
+    // 実際には 1/1 付の繰越仕訳が明細行として残高を供給する。
+    const section = await getLedgerSection({
+      userId: alice.id,
+      account: { id: cash.id, accountType: "asset", normalSide: "debit" },
+      selection: 2026,
+      aggStart: "2026-01-01",
+    });
+
+    expect(section.openingBalance).toBe(0);
+    expect(section.showOpeningRow).toBe(false);
+    expect(section.rows.map((r) => r.description)).toEqual(["当年の売上"]);
+  });
+
+  test("subAccountId を渡すと前期繰越も明細もその補助科目分だけになる", async () => {
+    const alice = await createUser("alice@example.com");
+    const bank = await createAccount(alice.id, "110", "普通預金", "asset");
+    const sales = await createAccount(alice.id, "400", "売上高", "revenue");
+    const bankA = await prisma.subAccount.create({
+      data: { accountId: bank.id, name: "A銀行" },
+    });
+    const bankB = await prisma.subAccount.create({
+      data: { accountId: bank.id, name: "B銀行" },
+    });
+    const deposit = (sub: number, amount: number) => [
+      { accountId: bank.id, subAccountId: sub, side: "debit" as const, amount },
+      { accountId: sales.id, side: "credit" as const, amount },
+    ];
+    await createEntry(alice.id, "2025-03-01", "前年入金A", deposit(bankA.id, 10000));
+    await createEntry(alice.id, "2025-04-01", "前年入金B", deposit(bankB.id, 20000));
+    await createEntry(alice.id, "2026-02-01", "当年入金A", deposit(bankA.id, 3000));
+    await createEntry(alice.id, "2026-03-01", "当年入金B", deposit(bankB.id, 4000));
+
+    const section = await getLedgerSection({
+      userId: alice.id,
+      account: { id: bank.id, accountType: "asset", normalSide: "debit" },
+      selection: 2026,
+      subAccountId: bankA.id,
+    });
+
+    expect(section.openingBalance).toBe(10000);
+    expect(section.showOpeningRow).toBe(true);
+    expect(section.rows.map((r) => r.description)).toEqual(["当年入金A"]);
+    expect(section.closingBalance).toBe(13000);
   });
 });
 
