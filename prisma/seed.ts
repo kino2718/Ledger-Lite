@@ -132,7 +132,6 @@ async function main() {
     update: data,
     create: data,
   });
-  console.log({ kino2718 });
 
   await seedAccounts(kino2718.id);
   const accountCount = await prisma.account.count({
