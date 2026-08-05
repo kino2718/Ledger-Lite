@@ -62,30 +62,46 @@ export default async function EditJournalEntryPage({
         {locked ? (
           <LockedEntryView userId={userId} entry={entry} />
         ) : (
-          <>
-            <JournalForm
-              accounts={accounts}
-              // 対象 ID を結び付けた更新アクションを渡す。
-              action={updateEntryAction.bind(null, id)}
-              initialEntryDate={entry.entryDate}
-              initialDescription={entry.description ?? undefined}
-              initialPairs={linesToPairs(entry.lines)}
-              submitLabel="更新"
-              cancelHref="/journal"
-            />
+          <JournalForm
+            accounts={accounts}
+            // 対象 ID を結び付けた更新アクションを渡す。
+            action={updateEntryAction.bind(null, id)}
+            initialEntryDate={entry.entryDate}
+            initialDescription={entry.description ?? undefined}
+            initialPairs={linesToPairs(entry.lines)}
+            submitLabel="更新"
+            cancelHref="/journal"
+          />
+        )}
 
-            {/* 削除はフォームと独立した操作なので、区切って下部に配置する。 */}
-            <div className="mt-8 flex items-center justify-between border-t border-black/8 pt-6 dark:border-white/10">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                この仕訳を削除します。
-              </p>
-              {/* 対象 ID を結び付けた削除アクションを渡す。 */}
-              <DeleteButton
-                action={deleteEntryAction.bind(null, id)}
-                confirmMessage="この仕訳を削除します。元に戻せません。よろしいですか？"
-              />
-            </div>
-          </>
+        {/* コピーして新規作成。締め済みの年の仕訳も雛形として使えるよう
+            locked でも出す。繰越仕訳は年度締めが作るものなので対象外。 */}
+        {!entry.isOpening && (
+          <div className="mt-8 flex items-center justify-between border-t border-black/8 pt-6 dark:border-white/10">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              この仕訳をコピーして、今日の日付で新しい仕訳を作ります。
+            </p>
+            <Link
+              href={`/journal/new?from=${id}`}
+              className="inline-flex h-11 items-center rounded-full border border-black/12 px-5 text-sm font-medium text-black transition-colors hover:bg-black/4 dark:border-white/20 dark:text-zinc-50 dark:hover:bg-white/6"
+            >
+              コピーして新規作成
+            </Link>
+          </div>
+        )}
+
+        {/* 削除はフォームと独立した操作なので、区切って下部に配置する。 */}
+        {!locked && (
+          <div className="mt-8 flex items-center justify-between border-t border-black/8 pt-6 dark:border-white/10">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              この仕訳を削除します。
+            </p>
+            {/* 対象 ID を結び付けた削除アクションを渡す。 */}
+            <DeleteButton
+              action={deleteEntryAction.bind(null, id)}
+              confirmMessage="この仕訳を削除します。元に戻せません。よろしいですか？"
+            />
+          </div>
         )}
       </main>
     </div>

@@ -126,12 +126,16 @@ export function JournalForm({
     initialEntryDate ?? todayString(),
   );
 
+  // 摘要も state で持つ。仕訳のコピーでは初期値入りの新規フォームになるため、
+  // React のフォームリセット任せだと保存後にコピー元の文言へ戻ってしまう。
+  const [description, setDescription] = useState(initialDescription ?? "");
+
   // 編集時は既存明細から作った組を、新規時は空の 1 組から始める。
   const [pairs, setPairs] = useState<Pair[]>(initialPairs ?? [emptyPair()]);
 
   // 保存に成功したら（作成フォームのみ。編集は成功時リダイレクト）、
-  // 明細を空に戻して次の仕訳をすぐ入力できるようにする。
-  // 摘要は React のフォームリセットで空に戻り、取引日は上の state が保つ。
+  // 明細と摘要を空に戻して次の仕訳をすぐ入力できるようにする。
+  // 取引日は上の state が保つ。
   // action の結果は毎回新しいオブジェクトなので、前回のレンダーで見た値と
   // 比較して「新しい結果が来たとき」だけ処理する（レンダー中の state 調整）。
   const [handledState, setHandledState] = useState(state);
@@ -139,6 +143,7 @@ export function JournalForm({
     setHandledState(state);
     if (state?.saved) {
       setPairs([emptyPair()]);
+      setDescription("");
     }
   }
 
@@ -208,7 +213,8 @@ export function JournalForm({
             name="description"
             type="text"
             placeholder="例: 現金売上"
-            defaultValue={initialDescription}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             className={inputClass}
           />
         </div>
