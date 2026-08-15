@@ -47,3 +47,6 @@ next-env.d.ts
 
 # 設計時に参照するローカル専用の資料（git 管理外）
 /reference
+
+# Claude Code のローカル設定（このマシン固有の権限・プレビュー設定）
+/.claude
