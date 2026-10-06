@@ -1,4 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+// credentials.ts は "server-only" を読み込むためテストでは空モックに差し替える。
+vi.mock("server-only", () => ({}));
+
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { authorizeCredentials } from "@/lib/credentials";
