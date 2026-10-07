@@ -188,11 +188,11 @@ export default async function LedgerPage({
                   </span>
                 </div>
               )}
-              {/* 各行は元の仕訳の編集ページへのリンク */}
+              {/* 各行は元の仕訳の内容ページへのリンク */}
               {rows.map((row, i) => (
                 <Link
                   key={`${row.entryId}-${i}`}
-                  href={`/journal/${row.entryId}/edit`}
+                  href={`/journal/${row.entryId}`}
                   className={`grid ${GRID_COLS} gap-2 border-b border-black/5 px-4 py-2 text-sm transition-colors last:border-0 hover:bg-black/4 dark:border-white/5 dark:hover:bg-white/6`}
                 >
                   <span className="tabular-nums text-zinc-500 dark:text-zinc-400">

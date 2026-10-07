@@ -9,7 +9,7 @@ import type { JournalFormState } from "@/lib/journal/form";
 
 // 仕訳更新の Server Action。対象 ID はページ側で bind して渡すため第1引数に置く。
 // useActionState から呼ばれるので、続いて前回の state と FormData を受け取る。
-// 検証 NG なら errors を返し、成功時は一覧へリダイレクトする。
+// 検証 NG なら errors を返し、成功時は内容ページ（/journal/[id]）へリダイレクトする。
 export async function updateEntryAction(
   id: number,
   _prevState: JournalFormState | undefined,
@@ -27,10 +27,11 @@ export async function updateEntryAction(
     return { errors: result.errors };
   }
 
-  // ダッシュボードと一覧の集計を最新化してから一覧へ遷移する。
+  // ダッシュボードと一覧の集計を最新化してから、更新した仕訳の内容ページへ戻る。
   revalidatePath("/");
   revalidatePath("/journal");
-  redirect("/journal");
+  revalidatePath(`/journal/${id}`);
+  redirect(`/journal/${id}`);
 }
 
 // 仕訳削除の Server Action。対象 ID はページ側で bind して渡す。

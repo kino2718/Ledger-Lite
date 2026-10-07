@@ -251,7 +251,7 @@ export default async function Home() {
                     className="border-b border-black/5 last:border-0 dark:border-white/5"
                   >
                     <Link
-                      href={`/journal/${entry.id}/edit`}
+                      href={`/journal/${entry.id}`}
                       className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-black/4 dark:hover:bg-white/6"
                     >
                       <div className="min-w-0">

@@ -225,7 +225,7 @@ export default async function ClosingPage() {
                             締めた日時: {formatDateTime(closing.createdAt)}
                           </span>
                           <Link
-                            href={`/journal/${closing.openingEntryId}/edit`}
+                            href={`/journal/${closing.openingEntryId}`}
                             className="text-xs text-zinc-500 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
                           >
                             繰越仕訳 →

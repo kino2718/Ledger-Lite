@@ -24,7 +24,7 @@ function EntryCard({ entry }: { entry: JournalEntryRow }) {
   return (
     <li className="break-inside-avoid">
       <Link
-        href={`/journal/${entry.id}/edit`}
+        href={`/journal/${entry.id}`}
         className="block rounded-2xl border border-black/8 bg-white p-4 shadow-sm transition-colors hover:border-black/20 print:rounded-none print:border-black/40 print:shadow-none dark:border-white/10 dark:bg-zinc-950 dark:hover:border-white/30"
       >
         <div className="mb-3 flex items-baseline justify-between gap-3">

@@ -2,7 +2,7 @@ import type { JournalEntryLineView } from "@/lib/journal/queries";
 import { yen } from "@/lib/format";
 
 // 借方・貸方それぞれの明細を縦に並べる（科目名＋補助科目と金額）。
-// 仕訳一覧と、締め済みの仕訳の読み取り専用表示で共用する。
+// 仕訳一覧と、仕訳の内容を表示するページで共用する。
 export function LineColumn({
   label,
   lines,
